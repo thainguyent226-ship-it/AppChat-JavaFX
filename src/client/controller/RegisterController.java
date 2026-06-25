@@ -45,11 +45,17 @@ public class RegisterController {
             out.println("REGISTER;" + username + ";" + password);
             
             String response = in.readLine();
-            if ("REGISTER_SUCCESS".equals(response)) {
+            if (response != null && response.startsWith("REGISTER_SUCCESS")) {
                 showAlert(AlertType.INFORMATION, "Thành công", "Đăng ký thành công! Hãy quay lại đăng nhập.");
-                handleBackToLogin(); // Đăng ký xong tự chuyển về màn hình đăng nhập
-            } else {
+                handleBackToLogin();
+            } else if (response != null && response.startsWith("REGISTER_FAILED;EXISTS")) {
                 showAlert(AlertType.ERROR, "Thất bại", "Tài khoản đã tồn tại trên hệ thống!");
+            } else if (response != null && response.startsWith("REGISTER_FAILED;DBERROR")) {
+                showAlert(AlertType.ERROR, "Lỗi cơ sở dữ liệu",
+                        "Server không kết nối được tới SQL Server nên KHÔNG lưu được tài khoản.\n" +
+                        "Hãy kiểm tra cửa sổ console đang chạy ServerApp để xem lỗi chi tiết.");
+            } else {
+                showAlert(AlertType.ERROR, "Thất bại", "Đăng ký thất bại! Phản hồi từ server: " + response);
             }
             socket.close();
         } catch (Exception e) {
@@ -60,7 +66,7 @@ public class RegisterController {
     @FXML
     private void handleBackToLogin() {
         try {
-            txtRegUsername.getScene().getWindow().hide(); // Ẩn màn hình đăng ký
+            txtRegUsername.getScene().getWindow().hide();
             Parent root = FXMLLoader.load(getClass().getResource("/src/client/view/LoginView.fxml"));
             Stage stage = new Stage();
             stage.setTitle("App Chat Client - Đăng nhập");

@@ -21,8 +21,19 @@
 
       <VBox HBox.hgrow="ALWAYS" style="-fx-padding: 15; -fx-background-color: #ffffff;" spacing="12">
          <children>
-            <Label fx:id="lblChattingWith" text="💬 Đang chat với: Bạn bè" 
-                   style="-fx-font-family: 'Segoe UI', Arial; -fx-font-weight: bold; -fx-font-size: 15px; -fx-text-fill: #34495e;" />
+            
+            <HBox alignment="CENTER_LEFT" spacing="10">
+               <children>
+                  <Label fx:id="lblChattingWith" text="💬 Đang chat với: Bạn bè" 
+                         style="-fx-font-family: 'Segoe UI', Arial; -fx-font-weight: bold; -fx-font-size: 15px; -fx-text-fill: #34495e;" HBox.hgrow="ALWAYS" maxWidth="Infinity" />
+                  
+                  <Button text="👤 Sửa thông tin" onAction="#openProfileWindow" prefHeight="30.0"
+                          style="-fx-background-color: #f1f3f5; -fx-background-radius: 15; -fx-text-fill: #2c3e50; -fx-font-weight: bold; -fx-font-size: 12px; -fx-cursor: hand; -fx-border-color: #ced4da; -fx-border-radius: 15;"/>
+                  
+                  <Button text="🚪 Đăng xuất" onAction="#handleLogout" prefHeight="30.0"
+                          style="-fx-background-color: #e74c3c; -fx-background-radius: 15; -fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 12px; -fx-cursor: hand; -fx-effect: dropshadow(three-pass-box, rgba(231,76,60,0.2), 5, 0, 0, 2);"/>
+               </children>
+            </HBox>
             
             <TextArea fx:id="txtChatArea" editable="false" wrapText="true" VBox.vgrow="ALWAYS" 
                       style="-fx-control-inner-background: #f8f9fa; -fx-background-color: #f8f9fa; -fx-background-radius: 10; -fx-border-color: #e9ecef; -fx-border-radius: 10; -fx-border-width: 1; -fx-font-family: 'Segoe UI', Arial; -fx-font-size: 13px; -fx-padding: 5;" />

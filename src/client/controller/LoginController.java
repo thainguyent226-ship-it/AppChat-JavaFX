@@ -13,7 +13,7 @@ import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
 import javafx.stage.Stage;
-import src.client.controller.ChatController; // Import Controller của màn hình chat để gọi hàm truyền dữ liệu
+import src.client.controller.ChatController; 
 
 public class LoginController {
 
@@ -28,13 +28,11 @@ public class LoginController {
         String username = txtUsername.getText().trim();
         String password = txtPassword.getText().trim();
 
-        // 1. Kiểm tra dữ liệu đầu vào (Validate)
         if (username.isEmpty() || password.isEmpty()) {
             showAlert(AlertType.ERROR, "Lỗi form", "Vui lòng nhập đầy đủ tài khoản và mật khẩu!");
             return;
         }
 
-        // 2. Tiến hành kết nối Socket gửi dữ liệu lên Server khi bấm nút
         try {
             System.out.println("[CLIENT] Đang kết nối tới Server để đăng nhập...");
             Socket socket = new Socket("localhost", 5000);
@@ -42,31 +40,24 @@ public class LoginController {
             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
-            // Gửi gói tin theo định dạng (Protocol tuần 2): LOGIN;username;password
             String loginPackage = "LOGIN;" + username + ";" + password;
             out.println(loginPackage);
             System.out.println("[CLIENT] Đã gửi gói tin: " + loginPackage);
 
-            // Nhận phản hồi từ Server
             String response = in.readLine();
             System.out.println("[CLIENT] Server phản hồi: " + response);
 
             if ("LOGIN_SUCCESS".equals(response)) {
-                // Chạy lệnh JavaFX để chuyển màn hình mượt mà
                 javafx.application.Platform.runLater(() -> {
                     try {
-                        // 1. Tải giao diện màn hình Chat chính lên trước
                         FXMLLoader loader = new FXMLLoader(getClass().getResource("/src/client/view/ChatView.fxml"));
                         Parent root = loader.load();
 
-                        // 2. LẤY CONTROLLER CỦA MÀN HÌNH CHAT VÀ TRUYỀN SOCKET SANG (MỚI NÂNG CẤP)
                         ChatController chatController = loader.getController();
-                        chatController.initData(socket, username); // Giao lại socket kết nối cho màn hình Chat cầm tiếp
+                        chatController.initData(socket, username); 
 
-                        // 3. Tắt (Ẩn) màn hình Đăng nhập hiện tại đi
                         txtUsername.getScene().getWindow().hide();
                         
-                        // 4. Hiển thị màn hình Chat lên
                         Stage chatStage = new Stage();
                         chatStage.setTitle("App Chat Hệ Thống - " + username);
                         chatStage.setScene(new Scene(root));
@@ -79,26 +70,20 @@ public class LoginController {
                 });
             } else {
                 showAlert(AlertType.ERROR, "Đăng nhập thất bại", "Tài khoản hoặc mật khẩu không chính xác!");
-                socket.close(); // Đăng nhập thất bại thì đóng socket luôn
+                socket.close(); 
             }
-
-            // ĐÓNG KẾT NỐI: Đã được comment lại để giữ socket cho ChatController dùng tiếp!
-            // socket.close();
 
         } catch (Exception e) {
             showAlert(AlertType.ERROR, "Lỗi kết nối", "Không thể kết nối đến Server! Hãy chắc chắn Server đã bật.");
         }
     }
 
-    // ---- HÀM CHUYỂN SANG MÀN HÌNH ĐĂNG KÝ KHI CLICK NÚT ----
     @FXML
     private void handleSwitchToRegister() {
         try {
             System.out.println("[CLIENT] Đang chuyển sang màn hình Đăng ký...");
-            // 1. Ẩn màn hình Đăng nhập hiện tại đi
             txtUsername.getScene().getWindow().hide();
 
-            // 2. Tải giao diện màn hình Đăng ký lên
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/src/client/view/RegisterView.fxml"));
             Parent root = loader.load();
             

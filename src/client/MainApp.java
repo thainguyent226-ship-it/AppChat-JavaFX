@@ -10,7 +10,7 @@ public class MainApp extends Application {
     @Override
     public void start(Stage primaryStage) {
         try {
-            // Chỉ load giao diện lên màn hình, không kết nối Socket tự động nữa
+           
             Parent root = FXMLLoader.load(getClass().getResource("/src/client/view/LoginView.fxml"));
             primaryStage.setTitle("App Chat Client ");
             primaryStage.setScene(new Scene(root));

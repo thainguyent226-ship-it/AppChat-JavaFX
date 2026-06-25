@@ -5,6 +5,20 @@
             "type": "java",
             "name": "ServerApp",
             "request": "launch",
+            "mainClass": "src.client.controller.ServerApp",
+            "projectName": "APP Chat_90790fb0"
+        },
+        {
+            "type": "java",
+            "name": "ServerApp",
+            "request": "launch",
+            "mainClass": "src.client.ServerApp",
+            "projectName": "APP Chat_90790fb0"
+        },
+        {
+            "type": "java",
+            "name": "ServerApp",
+            "request": "launch",
             "mainClass": "ServerApp",
             "projectName": "APP Chat_90790fb0"
         },
