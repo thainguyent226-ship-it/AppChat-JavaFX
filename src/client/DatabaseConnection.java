@@ -4,7 +4,6 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 
 public class DatabaseConnection {
-    // Chuỗi kết nối dùng tài khoản sa và mật khẩu 123456 siêu bảo mật, thông suốt mọi hệ thống
     private static final String URL = "jdbc:sqlserver://localhost\\SQLEXPRESS:1433;databaseName=app_chat;encrypt=true;trustServerCertificate=true;user=sa;password=123456;";
 
     public static Connection getConnection() {

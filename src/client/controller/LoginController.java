@@ -35,7 +35,7 @@ public class LoginController {
 
         try {
             System.out.println("[CLIENT] Đang kết nối tới Server để đăng nhập...");
-            Socket socket = new Socket("localhost", 5000);
+            Socket socket = new Socket(src.client.AppConfig.SERVER_HOST, src.client.AppConfig.SERVER_PORT);
 
             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
@@ -68,6 +68,9 @@ public class LoginController {
                         e.printStackTrace();
                     }
                 });
+            } else if ("LOGIN_FAILED;BLOCKED".equals(response)) {
+                showAlert(AlertType.ERROR, "Tài khoản bị khóa", "Tài khoản của bạn đã bị quản trị viên khóa. Vui lòng liên hệ quản trị viên.");
+                socket.close();
             } else {
                 showAlert(AlertType.ERROR, "Đăng nhập thất bại", "Tài khoản hoặc mật khẩu không chính xác!");
                 socket.close(); 

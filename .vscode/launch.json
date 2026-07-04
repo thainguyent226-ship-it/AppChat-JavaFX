@@ -5,21 +5,7 @@
             "type": "java",
             "name": "ServerApp",
             "request": "launch",
-            "mainClass": "src.client.controller.ServerApp",
-            "projectName": "APP Chat_90790fb0"
-        },
-        {
-            "type": "java",
-            "name": "ServerApp",
-            "request": "launch",
             "mainClass": "src.client.ServerApp",
-            "projectName": "APP Chat_90790fb0"
-        },
-        {
-            "type": "java",
-            "name": "ServerApp",
-            "request": "launch",
-            "mainClass": "ServerApp",
             "projectName": "APP Chat_90790fb0"
         },
         {
@@ -27,6 +13,8 @@
             "name": "Run MainApp",
             "request": "launch",
             "mainClass": "src.client.MainApp",
-           "vmArgs": "--module-path \"C:/openjfx-26.0.1_windows-x64_bin-sdk/javafx-sdk-26.0.1/lib\" --add-modules javafx.controls,javafx.fxml"
+            "projectName": "APP Chat_90790fb0",
+            "vmArgs": "--module-path \"C:/openjfx-26.0.1_windows-x64_bin-sdk/javafx-sdk-26.0.1/lib\" --add-modules javafx.controls,javafx.fxml"
+        }
     ]
 }

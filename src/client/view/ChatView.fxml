@@ -3,52 +3,101 @@
 <?import javafx.scene.layout.*?>
 <?import javafx.geometry.Insets?>
 
-<HBox prefHeight="550.0" prefWidth="750.0" 
-      style="-fx-background-color: #ffffff; -fx-background-radius: 15; -fx-border-radius: 15;" 
-      xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" 
+<HBox prefHeight="620.0" prefWidth="880.0"
+      style="-fx-background-color: #ffffff;"
+      xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="src.client.controller.ChatController">
    <children>
-      
-      <VBox prefWidth="240.0" style="-fx-background-color: #f4f6f8; -fx-padding: 15; -fx-border-color: transparent #e9ecef transparent transparent; -fx-border-width: 1;">
+
+      <!-- ================= SIDEBAR: danh sách hội thoại kiểu Messenger ================= -->
+      <VBox prefWidth="280.0" minWidth="280.0"
+            style="-fx-background-color: #ffffff; -fx-padding: 18 10 15 15; -fx-border-color: transparent #e4e6eb transparent transparent; -fx-border-width: 1;" spacing="14">
          <children>
-            <Label text="Đoạn hội thoại" 
-                   style="-fx-font-family: 'Segoe UI', Arial; -fx-font-weight: bold; -fx-font-size: 16px; -fx-text-fill: #2c3e50; -fx-margin-bottom: 15;" />
-            <Region prefHeight="10.0" />
-            <ListView fx:id="listFriends" VBox.vgrow="ALWAYS" 
-                      style="-fx-background-color: transparent; -fx-background-radius: 8; -fx-border-color: transparent; -fx-font-size: 13px; -fx-font-family: 'Segoe UI'; -fx-cursor: hand;" />
+            <HBox alignment="CENTER_LEFT" spacing="10">
+               <children>
+                  <Label text="Đoạn chat" HBox.hgrow="ALWAYS" maxWidth="Infinity"
+                         style="-fx-font-family: 'Segoe UI', Arial; -fx-font-weight: bold; -fx-font-size: 21px; -fx-text-fill: #050505;" />
+                  <Button fx:id="btnFriendRequests" text="🔔" onAction="#handleShowFriendRequests" prefWidth="34.0" prefHeight="34.0"
+                          style="-fx-background-color: #f0f2f5; -fx-background-radius: 17; -fx-font-size: 15px; -fx-cursor: hand;"/>
+               </children>
+            </HBox>
+
+            <VBox spacing="6" style="-fx-background-color: #f0f2f5; -fx-padding: 8; -fx-background-radius: 12;">
+               <children>
+                  <TextField fx:id="txtAddContact" promptText="Nhập username muốn chat..." prefHeight="30.0"
+                             style="-fx-background-color: #ffffff; -fx-background-radius: 8; -fx-font-size: 12px; -fx-border-color: transparent;"/>
+                  <Button text="➕ Gửi lời mời kết bạn" onAction="#handleAddContact" maxWidth="Infinity" prefHeight="28.0"
+                          style="-fx-background-color: #e7fff0; -fx-text-fill: #16a085; -fx-font-weight: bold; -fx-background-radius: 14; -fx-cursor: hand; -fx-font-size: 11px;"/>
+               </children>
+            </VBox>
+
+            <VBox spacing="6" style="-fx-background-color: #f0f2f5; -fx-padding: 8; -fx-background-radius: 12;">
+               <children>
+                  <TextField fx:id="txtGroupInput" promptText="Nhập tên nhóm..." prefHeight="30.0"
+                             style="-fx-background-color: #ffffff; -fx-background-radius: 8; -fx-font-size: 12px; -fx-border-color: transparent;"/>
+                  <HBox spacing="6">
+                     <children>
+                        <Button text="➕ Tạo nhóm" onAction="#handleCreateGroup" HBox.hgrow="ALWAYS" maxWidth="Infinity" prefHeight="28.0"
+                                style="-fx-background-color: #e7f3ff; -fx-text-fill: #0084ff; -fx-font-weight: bold; -fx-background-radius: 14; -fx-cursor: hand; -fx-font-size: 11px;"/>
+                        <Button text="🚪 Vào nhóm" onAction="#handleJoinGroup" HBox.hgrow="ALWAYS" maxWidth="Infinity" prefHeight="28.0"
+                                style="-fx-background-color: #f3e8ff; -fx-text-fill: #9b59b6; -fx-font-weight: bold; -fx-background-radius: 14; -fx-cursor: hand; -fx-font-size: 11px;"/>
+                     </children>
+                  </HBox>
+               </children>
+            </VBox>
+
+            <ListView fx:id="listFriends" VBox.vgrow="ALWAYS"
+                      style="-fx-background-color: transparent; -fx-border-color: transparent; -fx-font-size: 13px; -fx-font-family: 'Segoe UI'; -fx-cursor: hand;" />
          </children>
       </VBox>
 
-      <VBox HBox.hgrow="ALWAYS" style="-fx-padding: 15; -fx-background-color: #ffffff;" spacing="12">
+      <!-- ================= KHUNG CHAT CHÍNH ================= -->
+      <VBox HBox.hgrow="ALWAYS" style="-fx-background-color: #ffffff;">
          <children>
-            
-            <HBox alignment="CENTER_LEFT" spacing="10">
+
+            <!-- Thanh header -->
+            <HBox alignment="CENTER_LEFT" spacing="10" style="-fx-padding: 14 15 14 18; -fx-border-color: transparent transparent #e4e6eb transparent; -fx-border-width: 1;">
                <children>
-                  <Label fx:id="lblChattingWith" text="💬 Đang chat với: Bạn bè" 
-                         style="-fx-font-family: 'Segoe UI', Arial; -fx-font-weight: bold; -fx-font-size: 15px; -fx-text-fill: #34495e;" HBox.hgrow="ALWAYS" maxWidth="Infinity" />
-                  
+                  <Label fx:id="lblChattingWith" text="💬 "
+                         style="-fx-font-family: 'Segoe UI', Arial; -fx-font-weight: bold; -fx-font-size: 16px; -fx-text-fill: #050505;" HBox.hgrow="ALWAYS" maxWidth="Infinity" />
+
+                  <Button text="❌ Rời nhóm" onAction="#handleLeaveGroup" prefHeight="30.0"
+                          style="-fx-background-color: #fff0e6; -fx-background-radius: 15; -fx-text-fill: #e67e22; -fx-font-weight: bold; -fx-font-size: 12px; -fx-cursor: hand;"/>
+
                   <Button text="👤 Sửa thông tin" onAction="#openProfileWindow" prefHeight="30.0"
-                          style="-fx-background-color: #f1f3f5; -fx-background-radius: 15; -fx-text-fill: #2c3e50; -fx-font-weight: bold; -fx-font-size: 12px; -fx-cursor: hand; -fx-border-color: #ced4da; -fx-border-radius: 15;"/>
-                  
+                          style="-fx-background-color: #f0f2f5; -fx-background-radius: 15; -fx-text-fill: #050505; -fx-font-weight: bold; -fx-font-size: 12px; -fx-cursor: hand;"/>
+
                   <Button text="🚪 Đăng xuất" onAction="#handleLogout" prefHeight="30.0"
-                          style="-fx-background-color: #e74c3c; -fx-background-radius: 15; -fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 12px; -fx-cursor: hand; -fx-effect: dropshadow(three-pass-box, rgba(231,76,60,0.2), 5, 0, 0, 2);"/>
+                          style="-fx-background-color: #fdeaea; -fx-background-radius: 15; -fx-text-fill: #e74c3c; -fx-font-weight: bold; -fx-font-size: 12px; -fx-cursor: hand;"/>
                </children>
             </HBox>
-            
-            <TextArea fx:id="txtChatArea" editable="false" wrapText="true" VBox.vgrow="ALWAYS" 
-                      style="-fx-control-inner-background: #f8f9fa; -fx-background-color: #f8f9fa; -fx-background-radius: 10; -fx-border-color: #e9ecef; -fx-border-radius: 10; -fx-border-width: 1; -fx-font-family: 'Segoe UI', Arial; -fx-font-size: 13px; -fx-padding: 5;" />
-            
-            <HBox spacing="10.0" alignment="CENTER">
+
+            <!-- Vùng bong bóng tin nhắn -->
+            <ScrollPane fx:id="scrollChat" fitToWidth="true" VBox.vgrow="ALWAYS"
+                        style="-fx-background-color: #ffffff; -fx-background: #ffffff; -fx-border-color: transparent;">
+               <content>
+                  <VBox fx:id="vboxMessages" spacing="10" style="-fx-padding: 15 12 15 12; -fx-background-color: #ffffff;" />
+               </content>
+            </ScrollPane>
+
+            <!-- Thanh nhập tin nhắn -->
+            <HBox spacing="10.0" alignment="CENTER" style="-fx-padding: 10 15 16 15;">
                <children>
-                  <TextField fx:id="txtMessage" promptText="Nhập tin nhắn..." HBox.hgrow="ALWAYS" prefHeight="38.0"
-                             style="-fx-background-color: #f1f3f5; -fx-background-radius: 20; -fx-padding: 0 15 0 15; -fx-font-size: 13px; -fx-border-color: transparent;"/>
-                  
-                  <Button fx:id="btnSend" text="Gửi" prefWidth="85.0" prefHeight="36.0" onAction="#handleSendMessage" 
-                          style="-fx-background-color: linear-gradient(to right, #3498db, #2980b9); -fx-background-radius: 18; -fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 13px; -fx-cursor: hand; -fx-effect: dropshadow(three-pass-box, rgba(52,152,219,0.3), 5, 0, 0, 2);"/>
+                  <Button fx:id="btnAttachFile" text="📎" onAction="#handleSendFile" prefWidth="38.0" prefHeight="38.0"
+                          style="-fx-background-color: #f0f2f5; -fx-background-radius: 19; -fx-font-size: 15px; -fx-cursor: hand;"/>
+
+                  <Button fx:id="btnSticker" text="😀" onAction="#handleShowStickerPicker" prefWidth="38.0" prefHeight="38.0"
+                          style="-fx-background-color: #f0f2f5; -fx-background-radius: 19; -fx-font-size: 15px; -fx-cursor: hand;"/>
+
+                  <TextField fx:id="txtMessage" promptText="Aa" HBox.hgrow="ALWAYS" prefHeight="42.0"
+                             style="-fx-background-color: #f0f2f5; -fx-background-radius: 21; -fx-padding: 0 16 0 16; -fx-font-size: 13px; -fx-border-color: transparent;"/>
+
+                  <Button fx:id="btnSend" text="➤" prefWidth="42.0" prefHeight="42.0" onAction="#handleSendMessage"
+                          style="-fx-background-color: #0084ff; -fx-background-radius: 21; -fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 16px; -fx-cursor: hand;"/>
                </children>
             </HBox>
          </children>
       </VBox>
-      
+
    </children>
 </HBox>
