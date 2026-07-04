@@ -1,6 +1,7 @@
 package src.client.controller;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -16,11 +17,15 @@ import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
+import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -28,8 +33,10 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
+import javafx.scene.shape.Rectangle;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
+import javafx.stage.Popup;
 import javafx.stage.Stage;
 
 public class ChatController {
@@ -41,10 +48,11 @@ public class ChatController {
     @FXML private ListView<String> listFriends;
     @FXML private Label lblChattingWith;
     @FXML private TextField txtOtpInput;
-    @FXML private TextField txtGroupInput;
+    @FXML private Button btnGroupOptions;
     @FXML private Button btnFriendRequests;
     @FXML private Button btnAttachFile;
     @FXML private Button btnSticker;
+    @FXML private Button btnSettings;
 
     private Socket socket;
     private PrintWriter out;
@@ -56,10 +64,15 @@ public class ChatController {
     private final Set<String> unreadChats = new HashSet<>();
     // Những bạn bè thật (đã accept) đang online -> hiện chấm xanh
     private final Set<String> onlineFriends = new HashSet<>();
+    // Theo dõi nhãn trạng thái (Đã gửi/Đã nhận/Đã xem) của tin nhắn CUỐI CÙNG mình gửi trong đoạn chat đang mở
+    private Label currentStatusLabel;
+    private String currentStatusContext;
     // Có lời mời kết bạn mới chưa xem hay không -> đổi màu nút chuông
     private boolean hasPendingFriendRequest = false;
-    // Danh sách mã sticker demo (emoji) để chọn gửi
-    private static final String[] STICKER_CODES = {"👍", "❤️", "😂", "😮", "😢", "🎉", "🔥", "👏"};
+    // Danh sách sticker demo: dùng ký hiệu Unicode đơn giản (không phải emoji màu) để không phụ thuộc font đặc biệt,
+    // hầu như mọi máy Windows đều có sẵn font hiển thị được nhóm ký tự này -> chắc chắn hiện ra hình, không bị vỡ chữ
+    private static final String[] STICKER_CODES = {"♥", "★", "☺", "☹", "✓", "♪", "☀", "✈"};
+    private static final String[] STICKER_COLORS = {"#e74c3c", "#f39c12", "#f1c40f", "#3498db", "#27ae60", "#9b59b6", "#e67e22", "#16a085"};
     // Bảng màu cố định để avatar cùng 1 người luôn cùng 1 màu
     private static final String[] AVATAR_COLORS = {
         "#0084ff", "#9b59b6", "#e67e22", "#16a085", "#e74c3c", "#2c3e50", "#f39c12", "#8e44ad"
@@ -162,7 +175,8 @@ public class ChatController {
 
     // isMe = true -> bong bóng xanh, nằm bên phải (tin của mình)
     // isMe = false -> bong bóng xám, nằm bên trái (tin của người khác), kèm tên người gửi phía trên
-    private void addMessageBubble(String sender, String content, boolean isMe) {
+    // statusText != null (chỉ áp dụng cho tin của mình) -> hiện thêm nhãn nhỏ "Đã gửi/Đã nhận/Đã xem" dưới bong bóng, trả về Label đó để cập nhật sau
+    private Label addMessageBubble(String sender, String content, boolean isMe, String statusText) {
         HBox row = new HBox();
         row.setAlignment(isMe ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
 
@@ -184,9 +198,28 @@ public class ChatController {
             : "-fx-background-color: #e4e6eb; -fx-text-fill: #050505; -fx-background-radius: 18; -fx-padding: 9 14 9 14; -fx-font-size: 13px; -fx-font-family: 'Segoe UI';");
 
         bubbleBox.getChildren().add(bubble);
+
+        Label statusLabel = null;
+        if (isMe && statusText != null) {
+            statusLabel = new Label(statusText);
+            statusLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: #8a8d91; -fx-padding: 2 4 0 0; -fx-font-family: 'Segoe UI';");
+            bubbleBox.getChildren().add(statusLabel);
+        }
+
         row.getChildren().add(bubbleBox);
         vboxMessages.getChildren().add(row);
         scrollToBottom();
+        return statusLabel;
+    }
+
+    // Chuyển mã trạng thái từ server thành chữ hiển thị tiếng Việt
+    private String statusLabelText(String status) {
+        switch (status) {
+            case "SENT": return "Đã gửi";
+            case "DELIVERED": return "Đã nhận";
+            case "SEEN": return "Đã xem";
+            default: return "";
+        }
     }
 
     // Thông báo hệ thống hiển thị dạng viên thuốc xám căn giữa (vd: cảnh báo, thông báo lỗi nhẹ)
@@ -215,7 +248,12 @@ public class ChatController {
             String command = myGroups.contains(targetUser) ? "GROUP_CHAT" : "CHAT";
             String chatPackage = command + ";" + targetUser + ";" + msg;
             out.println(chatPackage);
-            addMessageBubble(currentUsername, msg, true);
+            if ("CHAT".equals(command)) {
+                currentStatusContext = targetUser;
+                currentStatusLabel = addMessageBubble(currentUsername, msg, true, "Đã gửi");
+            } else {
+                addMessageBubble(currentUsername, msg, true, null);
+            }
             txtMessage.clear();
         }
     }
@@ -285,26 +323,56 @@ public class ChatController {
         dialog.show();
     }
 
+    // Mở dialog gộp "Tạo nhóm mới" và "Tham gia nhóm có sẵn" - giống popup New Group của Messenger
     @FXML
-    private void handleCreateGroup() {
-        String groupName = txtGroupInput.getText().trim();
-        if (groupName.isEmpty()) {
-            showAlert(Alert.AlertType.WARNING, "Canh bao", "Vui long nhap ten nhom can tao!");
-            return;
-        }
-        out.println("CREATE_GROUP;" + currentUsername + ";" + groupName);
-        txtGroupInput.clear();
-    }
+    private void handleShowGroupDialog() {
+        Stage dialog = new Stage();
+        dialog.initModality(Modality.APPLICATION_MODAL);
+        dialog.setTitle("Nhóm chat");
 
-    @FXML
-    private void handleJoinGroup() {
-        String groupName = txtGroupInput.getText().trim();
-        if (groupName.isEmpty()) {
-            showAlert(Alert.AlertType.WARNING, "Canh bao", "Vui long nhap ten nhom can tham gia!");
-            return;
-        }
-        out.println("JOIN_GROUP;" + currentUsername + ";" + groupName);
-        txtGroupInput.clear();
+        VBox root = new VBox(14);
+        root.setPadding(new Insets(24));
+        root.setStyle("-fx-background-color: white;");
+
+        Label title = new Label("Tạo nhóm mới hoặc tham gia nhóm có sẵn");
+        title.setStyle("-fx-font-size: 15px; -fx-font-weight: bold; -fx-font-family: 'Segoe UI'; -fx-text-fill: #050505;");
+
+        TextField txtName = new TextField();
+        txtName.setPromptText("Nhập tên nhóm...");
+        txtName.setPrefHeight(38);
+        txtName.setStyle("-fx-background-color: #f0f2f5; -fx-background-radius: 8; -fx-font-size: 13px; -fx-border-color: transparent;");
+
+        Button createBtn = new Button("➕  Tạo nhóm mới");
+        createBtn.setMaxWidth(Double.MAX_VALUE);
+        createBtn.setPrefHeight(38);
+        createBtn.setStyle("-fx-background-color: #0084ff; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 10; -fx-cursor: hand; -fx-font-size: 13px;");
+        createBtn.setOnAction(e -> {
+            String name = txtName.getText().trim();
+            if (name.isEmpty()) {
+                showAlert(Alert.AlertType.WARNING, "Cảnh báo", "Vui lòng nhập tên nhóm cần tạo!");
+                return;
+            }
+            out.println("CREATE_GROUP;" + currentUsername + ";" + name);
+            dialog.close();
+        });
+
+        Button joinBtn = new Button("🚪  Tham gia nhóm đã có");
+        joinBtn.setMaxWidth(Double.MAX_VALUE);
+        joinBtn.setPrefHeight(38);
+        joinBtn.setStyle("-fx-background-color: #f3e8ff; -fx-text-fill: #9b59b6; -fx-font-weight: bold; -fx-background-radius: 10; -fx-cursor: hand; -fx-font-size: 13px;");
+        joinBtn.setOnAction(e -> {
+            String name = txtName.getText().trim();
+            if (name.isEmpty()) {
+                showAlert(Alert.AlertType.WARNING, "Cảnh báo", "Vui lòng nhập tên nhóm cần tham gia!");
+                return;
+            }
+            out.println("JOIN_GROUP;" + currentUsername + ";" + name);
+            dialog.close();
+        });
+
+        root.getChildren().addAll(title, txtName, createBtn, joinBtn);
+        dialog.setScene(new Scene(root, 340, 230));
+        dialog.show();
     }
 
     // Gửi file đính kèm, giới hạn tối đa 1MB
@@ -341,7 +409,7 @@ public class ChatController {
         }
     }
 
-    // Mở bảng chọn sticker nhỏ (emoji demo)
+    // Mở bảng chọn sticker dạng lưới nổi lên trên nút, giống sticker tray của Messenger
     @FXML
     private void handleShowStickerPicker() {
         String targetUser = listFriends.getSelectionModel().getSelectedItem();
@@ -349,48 +417,149 @@ public class ChatController {
             addSystemNotice("Vui lòng chọn một người/nhóm để gửi sticker!");
             return;
         }
-        ContextMenu menu = new ContextMenu();
-        for (String code : STICKER_CODES) {
-            MenuItem item = new MenuItem(code);
-            item.setStyle("-fx-font-size: 20px;");
-            item.setOnAction(e -> {
+
+        Popup popup = new Popup();
+        popup.setAutoHide(true);
+
+        GridPane grid = new GridPane();
+        grid.setHgap(4);
+        grid.setVgap(4);
+        grid.setPadding(new Insets(10));
+        grid.setStyle("-fx-background-color: white; -fx-background-radius: 16; " +
+                "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.25), 14, 0, 0, 4);");
+
+        int col = 0, row = 0;
+        for (int i = 0; i < STICKER_CODES.length; i++) {
+            String code = STICKER_CODES[i];
+            String colorHex = STICKER_COLORS[i % STICKER_COLORS.length];
+            Button btn = new Button(code);
+            btn.setPrefSize(46, 46);
+            String normalStyle = "-fx-background-color: transparent; -fx-font-size: 26px; -fx-text-fill: " + colorHex + "; -fx-cursor: hand; -fx-background-radius: 10;";
+            String hoverStyle = "-fx-background-color: #f0f2f5; -fx-font-size: 26px; -fx-text-fill: " + colorHex + "; -fx-cursor: hand; -fx-background-radius: 10;";
+            btn.setStyle(normalStyle);
+            btn.setOnMouseEntered(e -> btn.setStyle(hoverStyle));
+            btn.setOnMouseExited(e -> btn.setStyle(normalStyle));
+            btn.setOnAction(e -> {
                 out.println("STICKER;" + targetUser + ";" + code);
                 addStickerBubble(code, true);
+                popup.hide();
             });
-            menu.getItems().add(item);
+            grid.add(btn, col, row);
+            col++;
+            if (col == 4) { col = 0; row++; }
         }
-        menu.show(btnSticker, javafx.geometry.Side.TOP, 0, 0);
+
+        popup.getContent().add(grid);
+        Bounds bounds = btnSticker.localToScreen(btnSticker.getBoundsInLocal());
+        popup.show(btnSticker, bounds.getMinX() - 90, bounds.getMinY() - 140);
     }
 
-    // Vẽ bong bóng file đính kèm, kèm nút Lưu file
+    // Vẽ bong bóng file đính kèm - hiện ảnh trực tiếp nếu là file ảnh (giống Messenger), card đẹp cho file khác
     private void addFileBubble(String sender, String fileName, String base64Data, boolean isMe) {
         HBox row = new HBox();
         row.setAlignment(isMe ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
 
         VBox bubbleBox = new VBox(4);
-        bubbleBox.setMaxWidth(300);
-        bubbleBox.setStyle((isMe
-                ? "-fx-background-color: #e7f3ff;"
-                : "-fx-background-color: #e4e6eb;") + " -fx-background-radius: 14; -fx-padding: 10 14 10 14;");
+        bubbleBox.setAlignment(isMe ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
 
         if (!isMe) {
             Label nameLabel = new Label(sender);
-            nameLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #8a8d91; -fx-font-family: 'Segoe UI';");
+            nameLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #8a8d91; -fx-padding: 0 0 1 12; -fx-font-family: 'Segoe UI';");
             bubbleBox.getChildren().add(nameLabel);
         }
 
-        Label fileLabel = new Label("📎 " + fileName);
-        fileLabel.setWrapText(true);
-        fileLabel.setStyle("-fx-font-size: 13px; -fx-font-family: 'Segoe UI'; -fx-text-fill: #050505;");
+        String ext = fileName.contains(".") ? fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase() : "";
+        boolean isImage = ext.matches("png|jpg|jpeg|gif|bmp|webp");
 
-        Button saveBtn = new Button("💾 Lưu file về máy");
-        saveBtn.setStyle("-fx-background-color: #0084ff; -fx-text-fill: white; -fx-font-size: 11px; -fx-background-radius: 8; -fx-cursor: hand;");
-        saveBtn.setOnAction(e -> saveFileToDisk(fileName, base64Data));
+        if (isImage) {
+            try {
+                byte[] imgBytes = Base64.getDecoder().decode(base64Data);
+                Image image = new Image(new ByteArrayInputStream(imgBytes));
+                double fitWidth = Math.min(240, image.getWidth());
+                double fitHeight = fitWidth * (image.getHeight() / image.getWidth());
 
-        bubbleBox.getChildren().addAll(fileLabel, saveBtn);
+                ImageView imageView = new ImageView(image);
+                imageView.setFitWidth(fitWidth);
+                imageView.setFitHeight(fitHeight);
+                imageView.setSmooth(true);
+                imageView.setPreserveRatio(true);
+
+                Rectangle clip = new Rectangle(fitWidth, fitHeight);
+                clip.setArcWidth(18);
+                clip.setArcHeight(18);
+                imageView.setClip(clip);
+                imageView.setStyle("-fx-cursor: hand;");
+                imageView.setOnMouseClicked(e -> saveFileToDisk(fileName, base64Data));
+
+                bubbleBox.getChildren().add(imageView);
+            } catch (Exception ex) {
+                // Neu anh loi khong doc duoc, hien card file thuong thay the
+                bubbleBox.getChildren().add(buildFileCard(fileName, base64Data, isMe));
+            }
+        } else {
+            bubbleBox.getChildren().add(buildFileCard(fileName, base64Data, isMe));
+        }
+
         row.getChildren().add(bubbleBox);
         vboxMessages.getChildren().add(row);
         scrollToBottom();
+    }
+
+    // Card file đính kèm kiểu Messenger: icon theo loại file + tên + dung lượng + nút tải tròn
+    private HBox buildFileCard(String fileName, String base64Data, boolean isMe) {
+        String ext = fileName.contains(".") ? fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase() : "";
+
+        HBox card = new HBox(10);
+        card.setAlignment(Pos.CENTER_LEFT);
+        card.setMaxWidth(280);
+        card.setStyle((isMe ? "-fx-background-color: #e7f3ff;" : "-fx-background-color: #f0f2f5;") +
+                " -fx-background-radius: 14; -fx-padding: 10 12 10 12;");
+
+        Label iconLabel = new Label(fileIconFor(ext));
+        iconLabel.setStyle("-fx-font-size: 26px;");
+
+        VBox textBox = new VBox(2);
+        Label nameLabel = new Label(fileName);
+        nameLabel.setWrapText(true);
+        nameLabel.setMaxWidth(150);
+        nameLabel.setStyle("-fx-font-size: 12.5px; -fx-font-family: 'Segoe UI'; -fx-text-fill: #050505; -fx-font-weight: bold;");
+        Label sizeLabel = new Label(formatFileSize(base64Data));
+        sizeLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #65676b; -fx-font-family: 'Segoe UI';");
+        textBox.getChildren().addAll(nameLabel, sizeLabel);
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        Button downloadBtn = new Button("⬇");
+        downloadBtn.setPrefSize(30, 30);
+        downloadBtn.setStyle("-fx-background-color: #0084ff; -fx-text-fill: white; -fx-background-radius: 15; -fx-font-weight: bold; -fx-cursor: hand;");
+        downloadBtn.setOnAction(e -> saveFileToDisk(fileName, base64Data));
+
+        card.getChildren().addAll(iconLabel, textBox, spacer, downloadBtn);
+        return card;
+    }
+
+    // Chọn icon hiển thị theo phần đuôi mở rộng của file, giống Messenger phân loại file
+    private String fileIconFor(String ext) {
+        switch (ext) {
+            case "pdf": return "📕";
+            case "doc": case "docx": return "📝";
+            case "xls": case "xlsx": return "📊";
+            case "ppt": case "pptx": return "📽️";
+            case "zip": case "rar": case "7z": return "🗜️";
+            case "mp3": case "wav": case "m4a": return "🎵";
+            case "mp4": case "avi": case "mov": case "mkv": return "🎬";
+            case "txt": return "📄";
+            default: return "📁";
+        }
+    }
+
+    // Ước lượng dung lượng gốc từ độ dài chuỗi Base64 (Base64 dài hơn gốc khoảng 4/3 lần)
+    private String formatFileSize(String base64Data) {
+        long approxBytes = (long) (base64Data.length() * 0.75);
+        if (approxBytes < 1024) return approxBytes + " B";
+        if (approxBytes < 1024 * 1024) return String.format("%.1f KB", approxBytes / 1024.0);
+        return String.format("%.2f MB", approxBytes / (1024.0 * 1024.0));
     }
 
     private void saveFileToDisk(String fileName, String base64Data) {
@@ -407,15 +576,65 @@ public class ChatController {
         }
     }
 
-    // Vẽ bong bóng sticker (emoji cỡ lớn)
+    // Vẽ bong bóng sticker (ký hiệu cỡ lớn, tô màu riêng, không nền, giống sticker thật của Messenger)
     private void addStickerBubble(String stickerCode, boolean isMe) {
         HBox row = new HBox();
         row.setAlignment(isMe ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
         Label sticker = new Label(stickerCode);
-        sticker.setStyle("-fx-font-size: 42px;");
+        sticker.setStyle("-fx-font-size: 56px; -fx-text-fill: " + colorForSticker(stickerCode) + "; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.15), 4, 0, 0, 2);");
         row.getChildren().add(sticker);
         vboxMessages.getChildren().add(row);
         scrollToBottom();
+    }
+
+    // Tra đúng màu ứng với mã sticker, mặc định màu xám nếu không tìm thấy (vd sticker cũ không còn trong danh sách)
+    private String colorForSticker(String code) {
+        for (int i = 0; i < STICKER_CODES.length; i++) {
+            if (STICKER_CODES[i].equals(code)) return STICKER_COLORS[i % STICKER_COLORS.length];
+        }
+        return "#65676b";
+    }
+
+    // Menu cài đặt gộp chung: Thêm thành viên (chỉ hiện khi đang xem nhóm) / Rời nhóm / Sửa thông tin / Đăng xuất
+    @FXML
+    private void handleShowSettingsMenu(ActionEvent event) {
+        ContextMenu menu = new ContextMenu();
+        menu.setStyle("-fx-font-family: 'Segoe UI';");
+
+        String selected = listFriends.getSelectionModel().getSelectedItem();
+        boolean viewingGroup = selected != null && myGroups.contains(selected);
+
+        if (viewingGroup) {
+            MenuItem addMemberItem = new MenuItem("👤➕  Thêm thành viên vào nhóm");
+            addMemberItem.setOnAction(e -> handleInviteToGroup(selected));
+            menu.getItems().add(addMemberItem);
+        }
+
+        MenuItem leaveGroupItem = new MenuItem("❌  Rời nhóm");
+        leaveGroupItem.setOnAction(e -> handleLeaveGroup());
+
+        MenuItem editProfileItem = new MenuItem("👤  Sửa thông tin");
+        editProfileItem.setOnAction(e -> openProfileWindow(event));
+
+        MenuItem logoutItem = new MenuItem("🚪  Đăng xuất");
+        logoutItem.setOnAction(e -> handleLogout(event));
+
+        menu.getItems().addAll(leaveGroupItem, editProfileItem, new SeparatorMenuItem(), logoutItem);
+        menu.show(btnSettings, javafx.geometry.Side.TOP, 0, 0);
+    }
+
+    // Mời thẳng 1 username vào nhóm đang chọn - không cần người kia phải tự gõ tên nhóm để tham gia
+    private void handleInviteToGroup(String groupName) {
+        TextInputDialog dialog = new TextInputDialog();
+        dialog.setTitle("Thêm thành viên");
+        dialog.setHeaderText(null);
+        dialog.setContentText("Nhập username cần thêm vào nhóm \"" + groupName + "\":");
+        dialog.showAndWait().ifPresent(username -> {
+            String target = username.trim();
+            if (!target.isEmpty()) {
+                out.println("INVITE_TO_GROUP;" + groupName + ";" + target);
+            }
+        });
     }
 
     @FXML
@@ -486,7 +705,25 @@ public class ChatController {
                     final String msgFromServer = response;
                    
                     Platform.runLater(() -> {
-                        if (msgFromServer.startsWith("ONLINE_FRIENDS;")) {
+                        if (msgFromServer.startsWith("INVITE_SUCCESS;")) {
+                            String[] data = msgFromServer.split(";", 3);
+                            addSystemNotice("Đã thêm " + data[2] + " vào nhóm \"" + data[1] + "\".");
+                        }
+                        else if (msgFromServer.startsWith("INVITE_FAILED;")) {
+                            String[] data = msgFromServer.split(";", 2);
+                            showAlert(Alert.AlertType.ERROR, "Thất bại", "Không thể thêm người này vào nhóm \"" + data[1] + "\" (có thể đã là thành viên hoặc username không tồn tại).");
+                        }
+                        else if (msgFromServer.startsWith("ADDED_TO_GROUP;")) {
+                            String[] data = msgFromServer.split(";", 2);
+                            String groupName = data[1];
+                            myGroups.add(groupName);
+                            if (!listFriends.getItems().contains(groupName)) {
+                                listFriends.getItems().add(groupName);
+                            }
+                            listFriends.refresh();
+                            addSystemNotice("Bạn vừa được thêm vào nhóm \"" + groupName + "\"!");
+                        }
+                        else if (msgFromServer.startsWith("ONLINE_FRIENDS;")) {
                             String[] data = msgFromServer.split(";", 2);
                             String csv = data.length > 1 ? data[1] : "";
                             onlineFriends.clear();
@@ -501,11 +738,19 @@ public class ChatController {
                             String[] data = msgFromServer.split(";", 2);
                             onlineFriends.add(data[1]);
                             listFriends.refresh();
+                            String selected = listFriends.getSelectionModel().getSelectedItem();
+                            if (data[1].equals(selected)) {
+                                addSystemNotice(data[1] + " vừa online.");
+                            }
                         }
                         else if (msgFromServer.startsWith("FRIEND_OFFLINE;")) {
                             String[] data = msgFromServer.split(";", 2);
                             onlineFriends.remove(data[1]);
                             listFriends.refresh();
+                            String selected = listFriends.getSelectionModel().getSelectedItem();
+                            if (data[1].equals(selected)) {
+                                addSystemNotice(data[1] + " vừa offline.");
+                            }
                         }
                         else if (msgFromServer.startsWith("FRIEND_REQUEST;")) {
                             String[] data = msgFromServer.split(";", 2);
@@ -624,7 +869,7 @@ public class ChatController {
                             }
                             // Chỉ vẽ bong bóng nếu đang mở đúng đoạn chat với người gửi này
                             if (fromUser.equals(selected)) {
-                                addMessageBubble(fromUser, content, false);
+                                addMessageBubble(fromUser, content, false, null);
                             } else {
                                 unreadChats.add(fromUser);
                                 listFriends.refresh();
@@ -637,7 +882,7 @@ public class ChatController {
                             String content = data[3];
                             String selected = listFriends.getSelectionModel().getSelectedItem();
                             if (groupName.equals(selected)) {
-                                addMessageBubble(fromUser, content, false);
+                                addMessageBubble(fromUser, content, false, null);
                             } else {
                                 unreadChats.add(groupName);
                                 listFriends.refresh();
@@ -667,23 +912,42 @@ public class ChatController {
                             listFriends.refresh();
                         }
                         else if (msgFromServer.startsWith("HISTORY_DATA;")) {
-                            String[] data = msgFromServer.split(";", 3);
+                            String[] data = msgFromServer.split(";", 4);
                             String context = data.length > 1 ? data[1] : "";
                             String content = data.length > 2 ? data[2] : "";
+                            String myLastStatus = data.length > 3 ? data[3] : "NONE";
                             // Chỉ hiển thị nếu vẫn đang chọn đúng hội thoại đó (tránh đè nhầm khi user bấm chuyển qua lại nhanh)
                             String selected = listFriends.getSelectionModel().getSelectedItem();
                             if (context.equals(selected)) {
                                 clearMessages();
+                                currentStatusLabel = null;
+                                currentStatusContext = context;
                                 if (!content.isEmpty()) {
-                                    for (String line : content.split("\\|")) {
+                                    String[] lines = content.split("\\|");
+                                    for (int i = 0; i < lines.length; i++) {
+                                        String line = lines[i];
                                         String[] parts = line.split(": ", 2);
                                         String sender = parts.length > 0 ? parts[0] : "";
                                         String text = parts.length > 1 ? parts[1] : line;
-                                        addMessageBubble(sender, text, sender.equals(currentUsername));
+                                        boolean isMe = sender.equals(currentUsername);
+                                        boolean isLast = (i == lines.length - 1);
+                                        if (isMe && isLast && !"NONE".equals(myLastStatus)) {
+                                            currentStatusLabel = addMessageBubble(sender, text, true, statusLabelText(myLastStatus));
+                                        } else {
+                                            addMessageBubble(sender, text, isMe, null);
+                                        }
                                     }
                                 } else {
                                     addSystemNotice("Chưa có tin nhắn nào. Hãy bắt đầu cuộc trò chuyện!");
                                 }
+                            }
+                        }
+                        else if (msgFromServer.startsWith("MSG_STATUS;")) {
+                            String[] data = msgFromServer.split(";", 3);
+                            String context = data.length > 1 ? data[1] : "";
+                            String status = data.length > 2 ? data[2] : "";
+                            if (context.equals(currentStatusContext) && currentStatusLabel != null) {
+                                currentStatusLabel.setText(statusLabelText(status));
                             }
                         }
                         else if ("UPDATE_PROFILE_SUCCESS".equals(msgFromServer)) {

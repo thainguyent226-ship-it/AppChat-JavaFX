@@ -3,3 +3,31 @@
 [04/07/2026 22:49:08] LOGOUT - user: thuc123
 [04/07/2026 22:49:34] LOGIN - user: thanh123
 [04/07/2026 22:53:46] LOGOUT - user: thai123
+[04/07/2026 23:16:37] LOGIN - user: thanh123
+[04/07/2026 23:16:55] LOGIN - user: thai123
+[04/07/2026 23:17:13] ACCEPT_FRIEND - user: thanh123 - voi: thai123
+[04/07/2026 23:20:39] LOGOUT - user: thai123
+[04/07/2026 23:20:42] LOGOUT - user: thanh123
+[04/07/2026 23:22:56] LOGIN - user: thai123
+[04/07/2026 23:24:19] CREATE_GROUP - user: thai123 - group: 3 t
+[04/07/2026 23:26:24] LOGIN - user: thai123
+[04/07/2026 23:29:30] LOGOUT - user: thai123
+[04/07/2026 23:29:39] LOGIN - user: thai123
+[04/07/2026 23:30:41] LOGOUT - user: thai123
+[04/07/2026 23:30:48] LOGIN - user: thai123
+[04/07/2026 23:35:26] LOGOUT - user: thai123
+[04/07/2026 23:36:43] LOGIN - user: thai123
+[04/07/2026 23:36:59] LOGOUT - user: thai123
+[04/07/2026 23:37:29] LOGIN - user: thai123
+[04/07/2026 23:50:02] LOGOUT - user: thai123
+[04/07/2026 23:50:19] LOGIN - user: thai123
+[04/07/2026 23:50:37] CREATE_GROUP - user: thai123 - group: 3t
+[04/07/2026 23:55:56] LOGOUT - user: thai123
+[04/07/2026 23:56:09] LOGIN - user: thai123
+[04/07/2026 23:56:36] LOGOUT - user: thai123
+[04/07/2026 23:56:56] LOGIN - user: thai123
+[04/07/2026 23:57:10] CREATE_GROUP - user: thai123 - group: 123
+[05/07/2026 00:18:45] LOGOUT - user: thai123
+[05/07/2026 00:19:58] LOGIN - user: thanh123
+[05/07/2026 00:20:29] LOGIN - user: thai123
+[05/07/2026 00:20:54] LOGOUT - user: thai123

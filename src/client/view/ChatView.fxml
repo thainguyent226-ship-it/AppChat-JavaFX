@@ -13,10 +13,12 @@
       <VBox prefWidth="280.0" minWidth="280.0"
             style="-fx-background-color: #ffffff; -fx-padding: 18 10 15 15; -fx-border-color: transparent #e4e6eb transparent transparent; -fx-border-width: 1;" spacing="14">
          <children>
-            <HBox alignment="CENTER_LEFT" spacing="10">
+            <HBox alignment="CENTER_LEFT" spacing="8">
                <children>
                   <Label text="Đoạn chat" HBox.hgrow="ALWAYS" maxWidth="Infinity"
                          style="-fx-font-family: 'Segoe UI', Arial; -fx-font-weight: bold; -fx-font-size: 21px; -fx-text-fill: #050505;" />
+                  <Button fx:id="btnGroupOptions" text="👥" onAction="#handleShowGroupDialog" prefWidth="34.0" prefHeight="34.0"
+                          style="-fx-background-color: #f0f2f5; -fx-background-radius: 17; -fx-font-size: 15px; -fx-cursor: hand;"/>
                   <Button fx:id="btnFriendRequests" text="🔔" onAction="#handleShowFriendRequests" prefWidth="34.0" prefHeight="34.0"
                           style="-fx-background-color: #f0f2f5; -fx-background-radius: 17; -fx-font-size: 15px; -fx-cursor: hand;"/>
                </children>
@@ -31,23 +33,16 @@
                </children>
             </VBox>
 
-            <VBox spacing="6" style="-fx-background-color: #f0f2f5; -fx-padding: 8; -fx-background-radius: 12;">
-               <children>
-                  <TextField fx:id="txtGroupInput" promptText="Nhập tên nhóm..." prefHeight="30.0"
-                             style="-fx-background-color: #ffffff; -fx-background-radius: 8; -fx-font-size: 12px; -fx-border-color: transparent;"/>
-                  <HBox spacing="6">
-                     <children>
-                        <Button text="➕ Tạo nhóm" onAction="#handleCreateGroup" HBox.hgrow="ALWAYS" maxWidth="Infinity" prefHeight="28.0"
-                                style="-fx-background-color: #e7f3ff; -fx-text-fill: #0084ff; -fx-font-weight: bold; -fx-background-radius: 14; -fx-cursor: hand; -fx-font-size: 11px;"/>
-                        <Button text="🚪 Vào nhóm" onAction="#handleJoinGroup" HBox.hgrow="ALWAYS" maxWidth="Infinity" prefHeight="28.0"
-                                style="-fx-background-color: #f3e8ff; -fx-text-fill: #9b59b6; -fx-font-weight: bold; -fx-background-radius: 14; -fx-cursor: hand; -fx-font-size: 11px;"/>
-                     </children>
-                  </HBox>
-               </children>
-            </VBox>
-
             <ListView fx:id="listFriends" VBox.vgrow="ALWAYS"
                       style="-fx-background-color: transparent; -fx-border-color: transparent; -fx-font-size: 13px; -fx-font-family: 'Segoe UI'; -fx-cursor: hand;" />
+
+            <!-- Icon bánh răng cài đặt, góc dưới bên trái, giống Messenger -->
+            <HBox alignment="CENTER_LEFT" style="-fx-padding: 4 0 0 4; -fx-border-color: #e4e6eb transparent transparent transparent; -fx-border-width: 1;">
+               <children>
+                  <Button fx:id="btnSettings" text="⚙" onAction="#handleShowSettingsMenu" prefWidth="38.0" prefHeight="38.0"
+                          style="-fx-background-color: #f0f2f5; -fx-background-radius: 19; -fx-font-size: 17px; -fx-cursor: hand;"/>
+               </children>
+            </HBox>
          </children>
       </VBox>
 
@@ -60,15 +55,6 @@
                <children>
                   <Label fx:id="lblChattingWith" text="💬 "
                          style="-fx-font-family: 'Segoe UI', Arial; -fx-font-weight: bold; -fx-font-size: 16px; -fx-text-fill: #050505;" HBox.hgrow="ALWAYS" maxWidth="Infinity" />
-
-                  <Button text="❌ Rời nhóm" onAction="#handleLeaveGroup" prefHeight="30.0"
-                          style="-fx-background-color: #fff0e6; -fx-background-radius: 15; -fx-text-fill: #e67e22; -fx-font-weight: bold; -fx-font-size: 12px; -fx-cursor: hand;"/>
-
-                  <Button text="👤 Sửa thông tin" onAction="#openProfileWindow" prefHeight="30.0"
-                          style="-fx-background-color: #f0f2f5; -fx-background-radius: 15; -fx-text-fill: #050505; -fx-font-weight: bold; -fx-font-size: 12px; -fx-cursor: hand;"/>
-
-                  <Button text="🚪 Đăng xuất" onAction="#handleLogout" prefHeight="30.0"
-                          style="-fx-background-color: #fdeaea; -fx-background-radius: 15; -fx-text-fill: #e74c3c; -fx-font-weight: bold; -fx-font-size: 12px; -fx-cursor: hand;"/>
                </children>
             </HBox>
 

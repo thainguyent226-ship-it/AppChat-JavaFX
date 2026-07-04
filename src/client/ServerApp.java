@@ -291,16 +291,20 @@ public class ServerApp {
                             }
                             break;
 
-                        // 5. XỬ LÝ GỬI TIN NHẮN RIÊNG (1-1)
+                        // 5. XỬ LÝ GỬI TIN NHẮN RIÊNG (1-1) - có theo dõi trạng thái đã gửi/đã nhận
                         case "CHAT": {
                             String target = data[1];
                             String content = data[2];
                             String sender = loggedInUser;
-                            saveMessage(sender, target, null, content);
+                            int msgId = saveMessageAndGetId(sender, target, null, content, "TEXT");
                             PrintWriter targetOut = onlineUsers.get(target);
+                            String status = "SENT";
                             if (targetOut != null) {
                                 targetOut.println("MESSAGE;" + sender + ";" + content);
+                                status = "DELIVERED";
+                                if (msgId > 0) updateMessageStatus(msgId, "DELIVERED");
                             }
+                            out.println("MSG_STATUS;" + target + ";" + status);
                             System.out.println("[CHAT] " + sender + " -> " + target + ": " + content);
                             break;
                         }
@@ -326,7 +330,19 @@ public class ServerApp {
                         case "FETCH_HISTORY": {
                             String chatContext = data[1]; // Ten nhom hoac ten nguoi ban dang xem
                             String historyData = fetchChatHistory(loggedInUser, chatContext);
-                            out.println("HISTORY_DATA;" + chatContext + ";" + historyData);
+                            String myLastStatus = "NONE";
+                            if (!isGroup(chatContext)) {
+                                // Nguoi dung vua mo doan chat nay -> danh dau toan bo tin nhan cua doi phuong la DA XEM
+                                int updatedCount = markSeen(chatContext, loggedInUser);
+                                if (updatedCount > 0) {
+                                    PrintWriter senderOut = onlineUsers.get(chatContext);
+                                    if (senderOut != null) {
+                                        senderOut.println("MSG_STATUS;" + loggedInUser + ";SEEN");
+                                    }
+                                }
+                                myLastStatus = getLastOwnMessageStatus(loggedInUser, chatContext);
+                            }
+                            out.println("HISTORY_DATA;" + chatContext + ";" + historyData + ";" + myLastStatus);
                             System.out.println("[HISTORY] Da tai lich su chat cho: " + chatContext);
                             break;
                         }
@@ -452,6 +468,23 @@ public class ServerApp {
                                 if (targetOut != null) {
                                     targetOut.println("STICKER_MSG_DM;" + sender + ";" + stickerCode);
                                 }
+                            }
+                            break;
+                        }
+
+                        // 11. THÊM THẲNG THÀNH VIÊN VÀO NHÓM (không cần người kia tự gõ tên nhóm để join)
+                        case "INVITE_TO_GROUP": {
+                            String groupToInvite = data[1];
+                            String userToInvite = data[2];
+                            if (joinGroup(groupToInvite, userToInvite)) {
+                                out.println("INVITE_SUCCESS;" + groupToInvite + ";" + userToInvite);
+                                PrintWriter invitedOut = onlineUsers.get(userToInvite);
+                                if (invitedOut != null) {
+                                    invitedOut.println("ADDED_TO_GROUP;" + groupToInvite);
+                                }
+                                writeLog("INVITE_TO_GROUP", loggedInUser, "them " + userToInvite + " vao nhom " + groupToInvite);
+                            } else {
+                                out.println("INVITE_FAILED;" + groupToInvite);
                             }
                             break;
                         }
@@ -802,6 +835,65 @@ public class ServerApp {
             pstmt.setString(5, msgType);
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) { return false; }
+    }
+
+    // Giong saveMessage nhung tra ve ID vua sinh ra, de sau nay con cap nhat status (DELIVERED/SEEN) cho dung dong
+    private static int saveMessageAndGetId(String sender, String receiver, String groupName, String content, String msgType) {
+        String sql = "INSERT INTO messages (sender, receiver, group_name, content, msg_type) VALUES (?, ?, ?, ?, ?)";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql, java.sql.Statement.RETURN_GENERATED_KEYS)) {
+            if (conn == null) return -1;
+            pstmt.setString(1, sender);
+            if (receiver == null) pstmt.setNull(2, Types.NVARCHAR); else pstmt.setString(2, receiver);
+            if (groupName == null) pstmt.setNull(3, Types.NVARCHAR); else pstmt.setString(3, groupName);
+            pstmt.setString(4, content);
+            pstmt.setString(5, msgType);
+            int affected = pstmt.executeUpdate();
+            if (affected > 0) {
+                try (ResultSet keys = pstmt.getGeneratedKeys()) {
+                    if (keys.next()) return keys.getInt(1);
+                }
+            }
+        } catch (SQLException e) { /* tra ve -1 neu loi */ }
+        return -1;
+    }
+
+    private static boolean updateMessageStatus(int id, String status) {
+        String sql = "UPDATE messages SET status = ? WHERE id = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            if (conn == null) return false;
+            pstmt.setString(1, status);
+            pstmt.setInt(2, id);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) { return false; }
+    }
+
+    // Danh dau toan bo tin nhan tu "otherUser" gui cho "me" la DA XEM. Tra ve so dong thuc su bi cap nhat (>0 moi can bao lai cho nguoi gui)
+    private static int markSeen(String otherUser, String me) {
+        String sql = "UPDATE messages SET status = 'SEEN' WHERE sender = ? AND receiver = ? AND status <> 'SEEN'";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            if (conn == null) return 0;
+            pstmt.setString(1, otherUser);
+            pstmt.setString(2, me);
+            return pstmt.executeUpdate();
+        } catch (SQLException e) { return 0; }
+    }
+
+    // Lay trang thai cua tin nhan CUOI CUNG ma "me" gui cho "otherUser", de khoi phuc dung tem trang thai khi mo lai doan chat
+    private static String getLastOwnMessageStatus(String me, String otherUser) {
+        String sql = "SELECT TOP 1 status FROM messages WHERE sender = ? AND receiver = ? ORDER BY id DESC";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            if (conn == null) return "NONE";
+            pstmt.setString(1, me);
+            pstmt.setString(2, otherUser);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) return rs.getString("status");
+            }
+        } catch (SQLException e) { /* tra ve NONE neu loi */ }
+        return "NONE";
     }
 
     // Thực hiện query gom tin nhắn cũ từ bảng messages trong SQL Server
