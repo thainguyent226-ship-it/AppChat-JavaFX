@@ -69,3 +69,10 @@
 [05/07/2026 21:22:54] LOGIN - user: thai123
 [05/07/2026 21:24:39] LOGIN - user: thuc123
 [05/07/2026 21:27:08] LOGOUT - user: thai123
+[05/07/2026 21:32:20] BROADCAST - user: admin - <hi>
+[05/07/2026 21:32:38] LOGIN - user: thuc123
+[05/07/2026 21:33:11] LOGIN - user: thai123
+[05/07/2026 21:34:14] INVITE_TO_GROUP - user: thuc123 - them thai123 vao nhom 3W
+[05/07/2026 21:36:48] ACCEPT_FRIEND - user: thai123 - voi: thuc123
+[05/07/2026 22:22:24] LOGIN - user: thai123
+[05/07/2026 22:26:00] LOGOUT - user: thai123

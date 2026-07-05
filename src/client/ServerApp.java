@@ -36,16 +36,11 @@ public class ServerApp {
     private static final int PORT = 5000;
     private static final String LOG_FILE = "server_activity.log";
 
-    // --- DANH SÁCH CÁC CLIENT ĐANG ONLINE: username -> PrintWriter để bắn tin nhắn/broadcast ---
     private static final ConcurrentHashMap<String, PrintWriter> onlineUsers = new ConcurrentHashMap<>();
 
-    // --- CẤU HÌNH GỬI EMAIL OTP - THAY BẰNG TÀI KHOẢN GMAIL CỦA BẠN ---
-    // Lưu ý: KHÔNG dùng mật khẩu Gmail thường, phải tạo "Mật khẩu ứng dụng" (App Password) 16 ký tự
-    // Cách tạo: Bật xác minh 2 bước cho Gmail -> vào myaccount.google.com/apppasswords -> tạo mật khẩu ứng dụng
     private static final String SMTP_EMAIL = "your_email@gmail.com";        // TODO: đổi thành Gmail thật của bạn
     private static final String SMTP_APP_PASSWORD = "xxxx xxxx xxxx xxxx"; // TODO: dán App Password 16 ký tự vào đây
 
-    // Lưu mã OTP tạm thời theo email: email -> {mã, thời điểm hết hạn}
     private static final ConcurrentHashMap<String, OtpEntry> pendingOtp = new ConcurrentHashMap<>();
 
     private static class OtpEntry {
@@ -61,14 +56,12 @@ public class ServerApp {
         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
             System.out.println("[SERVER SQL] Da bat! Dang cho ket noi o cong " + PORT + "...");
 
-            // Luong rieng doc lenh admin tu console: stats | block <user> | unblock <user> | broadcast <noi dung>
             new Thread(ServerApp::runAdminConsole).start();
 
             while (true) {
                 Socket socket = serverSocket.accept();
                 System.out.println("[SERVER SQL] ==> Co một thiet bi Client ket noi vao!");
                 
-                // Đẻ luồng xử lý riêng biệt cho từng Client kết nối
                 new Thread(new ClientHandler(socket)).start();
             }
         } catch (Exception e) {
@@ -76,7 +69,6 @@ public class ServerApp {
         }
     }
 
-    // Ghi log hoat dong quan trong ra file (dang ky, dang nhap/xuat, tao nhom...) - de ton tai qua nhieu lan chay server
     private static synchronized void writeLog(String action, String username, String detail) {
         String time = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"));
         String line = "[" + time + "] " + action + " - user: " + username + (detail == null || detail.isEmpty() ? "" : " - " + detail);
@@ -87,7 +79,6 @@ public class ServerApp {
         }
     }
 
-    // Luong doc lenh tu console cua nguoi quan tri Server (khong can giao dien, dung command-line)
     private static void runAdminConsole() {
         Scanner scanner = new Scanner(System.in);
         System.out.println("[ADMIN] Go lenh quan tri: stats | block <user> | unblock <user> | broadcast <noi dung>");
@@ -147,10 +138,9 @@ public class ServerApp {
         }
     }
 
-    // --- LỚP XỬ LÝ ĐA LUỒNG CHO TỪNG CLIENT TRỰC TIẾP ---
     private static class ClientHandler implements Runnable {
         private Socket socket;
-        private String loggedInUser; // username cua client dang ket noi qua socket nay (chi co gia tri sau khi LOGIN thanh cong)
+        private String loggedInUser; // username sau khi LOGIN thanh cong
 
         public ClientHandler(Socket socket) { 
             this.socket = socket; 
@@ -159,8 +149,8 @@ public class ServerApp {
         @Override
         public void run() {
             try (
-                BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
-                PrintWriter out = new PrintWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8), true)
+                EncryptedReader in = new EncryptedReader(socket.getInputStream());
+                EncryptedWriter out = new EncryptedWriter(socket.getOutputStream())
             ) {
                 String clientMessage;
                 while ((clientMessage = in.readLine()) != null) {
@@ -187,7 +177,6 @@ public class ServerApp {
                             break;
 
                         case "REGISTER": {
-                            // Format moi: REGISTER;username;password;email;otpCode
                             if (data.length < 5) {
                                 out.println("REGISTER_FAILED;MISSING_OTP");
                                 break;
@@ -218,8 +207,6 @@ public class ServerApp {
                             break;
                         }
 
-                        // 0. GỬI MÃ OTP (bản đơn giản - trả thẳng mã về cho Client hiển thị, KHÔNG gửi email thật
-                        //    vì gửi email qua SMTP phụ thuộc mạng/thư viện, dễ lỗi trong môi trường demo/báo cáo)
                         case "SEND_OTP": {
                             String targetEmail = data[1];
                             String otpCode = generateOtpCode();
@@ -239,7 +226,12 @@ public class ServerApp {
                             }
                             break;
 
-                        // 1. XỬ LÝ XÁC THỰC EMAIL QUA MÃ OTP (dùng khi verify email độc lập, ví dụ trong màn hình Chat)
+                        case "GET_PROFILE": {
+                            String[] profile = getProfile(data[1]);
+                            out.println("PROFILE_DATA;" + String.join(";", profile));
+                            break;
+                        }
+
                         case "VERIFY_EMAIL_OTP": {
                             String verifyEmail = data[1];
                             String codeInput = data[2];
@@ -254,7 +246,6 @@ public class ServerApp {
                             break;
                         }
 
-                        // 2. XỬ LÝ TẠO NHÓM CHAT MỚI
                         case "CREATE_GROUP":
                             String creator = data[1];
                             String groupName = data[2];
@@ -270,7 +261,6 @@ public class ServerApp {
                             }
                             break;
 
-                        // 3. XỬ LÝ THAM GIA NHÓM CHAT ĐÃ TỒN TẠI
                         case "JOIN_GROUP":
                             String userJoin = data[1];
                             String targetGroup = data[2];
@@ -282,7 +272,6 @@ public class ServerApp {
                             }
                             break;
 
-                        // 3b. XỬ LÝ RỜI KHỎI NHÓM CHAT (trước đây client gửi nhưng server chưa xử lý)
                         case "LEAVE_GROUP":
                             String userLeave = data[1];
                             String groupToLeave = data[2];
@@ -294,7 +283,6 @@ public class ServerApp {
                             }
                             break;
 
-                        // 5. XỬ LÝ GỬI TIN NHẮN RIÊNG (1-1) - có theo dõi trạng thái đã gửi/đã nhận
                         case "CHAT": {
                             String target = data[1];
                             String content = data[2];
@@ -312,7 +300,6 @@ public class ServerApp {
                             break;
                         }
 
-                        // 6. XỬ LÝ GỬI TIN NHẮN TRONG NHÓM
                         case "GROUP_CHAT": {
                             String chatGroupName = data[1];
                             String content = data[2];
@@ -329,13 +316,11 @@ public class ServerApp {
                             break;
                         }
 
-                        // 4. XỬ LÝ LƯU TRỮ VÀ QUẢN LÝ LỊCH SỬ TIN NHẮN TRÊN SERVER (dữ liệu thật từ bảng messages)
                         case "FETCH_HISTORY": {
                             String chatContext = data[1]; // Ten nhom hoac ten nguoi ban dang xem
                             String historyData = fetchChatHistory(loggedInUser, chatContext);
                             String myLastStatus = "NONE";
                             if (!isGroup(chatContext)) {
-                                // Nguoi dung vua mo doan chat nay -> danh dau toan bo tin nhan cua doi phuong la DA XEM
                                 int updatedCount = markSeen(chatContext, loggedInUser);
                                 if (updatedCount > 0) {
                                     PrintWriter senderOut = onlineUsers.get(chatContext);
@@ -350,7 +335,6 @@ public class ServerApp {
                             break;
                         }
 
-                        // 7. LẤY LẠI DANH SÁCH NHÓM + NGƯỜI ĐÃ TỪNG CHAT + BẠN BÈ THẬT (khôi phục sidebar khi đăng nhập lại)
                         case "GET_MY_CHATS": {
                             List<String> myGroupsList = getGroupsOfUser(loggedInUser);
                             List<String> myContacts = getDmContactsOfUser(loggedInUser);
@@ -359,16 +343,16 @@ public class ServerApp {
                                 if (!myContacts.contains(f)) myContacts.add(f);
                             }
                             out.println("MY_CHATS;" + String.join(",", myGroupsList) + ";" + String.join(",", myContacts));
-                            // Gui kem danh sach ban be dang online trong so ban be that
                             List<String> onlineFriends = new ArrayList<>();
                             for (String f : myFriends) {
                                 if (onlineUsers.containsKey(f)) onlineFriends.add(f);
                             }
                             out.println("ONLINE_FRIENDS;" + String.join(",", onlineFriends));
+                            System.out.println("[DEBUG] " + loggedInUser + " co ban be (ACCEPTED): " + myFriends);
+                            System.out.println("[DEBUG] " + loggedInUser + " dang online tong cong: " + onlineUsers.keySet());
                             break;
                         }
 
-                        // 8. HỆ THỐNG BẠN BÈ: gửi lời mời kết bạn
                         case "ADD_FRIEND": {
                             String toUser = data[1];
                             String fromUser = loggedInUser;
@@ -389,7 +373,6 @@ public class ServerApp {
                             break;
                         }
 
-                        // 8b. Chấp nhận lời mời kết bạn
                         case "ACCEPT_FRIEND": {
                             String fromUser = data[1]; // nguoi da gui loi moi truoc do
                             if (acceptFriendRequest(fromUser, loggedInUser)) {
@@ -405,7 +388,6 @@ public class ServerApp {
                             break;
                         }
 
-                        // 8c. Từ chối lời mời kết bạn
                         case "REJECT_FRIEND": {
                             String fromUser = data[1];
                             rejectFriendRequest(fromUser, loggedInUser);
@@ -413,19 +395,16 @@ public class ServerApp {
                             break;
                         }
 
-                        // 8d. Lấy danh sách lời mời kết bạn đang chờ
                         case "GET_FRIEND_REQUESTS": {
                             List<String> pending = getPendingFriendRequests(loggedInUser);
                             out.println("FRIEND_REQUESTS;" + String.join(",", pending));
                             break;
                         }
 
-                        // 9. GỬI FILE ĐÍNH KÈM (tối đa 1MB, mã hóa Base64 truyền qua text)
                         case "FILE": {
                             String target = data[1];
                             String fileName = data[2];
                             String base64Data = data[3];
-                            // 1MB nhi phan ~ 1,398,101 ky tu khi ma hoa Base64 (ty le ~4/3)
                             if (base64Data.length() > 1_398_101) {
                                 out.println("FILE_FAILED;TOO_LARGE");
                                 break;
@@ -451,7 +430,6 @@ public class ServerApp {
                             break;
                         }
 
-                        // 10. GỬI STICKER
                         case "STICKER": {
                             String target = data[1];
                             String stickerCode = data[2];
@@ -475,7 +453,6 @@ public class ServerApp {
                             break;
                         }
 
-                        // 11. THÊM THẲNG THÀNH VIÊN VÀO NHÓM (không cần người kia tự gõ tên nhóm để join)
                         case "INVITE_TO_GROUP": {
                             String groupToInvite = data[1];
                             String userToInvite = data[2];
@@ -509,8 +486,6 @@ public class ServerApp {
             }
         }
     }
-
-    // --- CÁC HÀM TRUY VẤN SQL SERVER (ĐÃ RÁP NỐI ĐẦY ĐỦ LOGIC ĐỀ BÀI) ---
 
     private static boolean checkLogin(String user, String pass) {
         String sql = "SELECT * FROM users WHERE username = ? AND password = ?";
@@ -558,7 +533,6 @@ public class ServerApp {
         } catch (SQLException e) { return false; }
     }
 
-    // Gui loi moi ket ban - tra ve "OK", "EXISTS" (da la ban hoac da co loi moi), hoac "ERROR"
     private static String sendFriendRequest(String fromUser, String toUser) {
         String checkSql = "SELECT status FROM friends WHERE (user1 = ? AND user2 = ?) OR (user1 = ? AND user2 = ?)";
         String insertSql = "INSERT INTO friends (user1, user2, status) VALUES (?, ?, 'PENDING')";
@@ -634,10 +608,10 @@ public class ServerApp {
         return result;
     }
 
-    // Thong bao cho toan bo ban be (dang online) biet user nay vua online/offline
     private static void notifyFriendsStatus(String user, boolean online) {
         List<String> friendsList = getAcceptedFriends(user);
         String msg = (online ? "FRIEND_ONLINE;" : "FRIEND_OFFLINE;") + user;
+        System.out.println("[DEBUG] notifyFriendsStatus(" + user + ", online=" + online + ") -> ban be: " + friendsList);
         for (String friend : friendsList) {
             PrintWriter friendOut = onlineUsers.get(friend);
             if (friendOut != null) {
@@ -656,7 +630,6 @@ public class ServerApp {
             pstmt.setString(3, email);
             return pstmt.executeUpdate() > 0 ? "OK" : "DBERROR";
         } catch (SQLException e) {
-            // Ma loi 2627/2601 cua SQL Server = vi pham UNIQUE constraint (username da ton tai)
             if (e.getErrorCode() == 2627 || e.getErrorCode() == 2601) {
                 return "EXISTS";
             }
@@ -665,14 +638,12 @@ public class ServerApp {
         }
     }
 
-    // Sinh ngau nhien 1 ma OTP gom 6 chu so, tu 100000 den 999999
     private static String generateOtpCode() {
         Random rnd = new Random();
         int code = 100000 + rnd.nextInt(900000);
         return String.valueOf(code);
     }
 
-    // Gui ma OTP that qua email bang SMTP Gmail
     private static boolean sendOtpEmail(String toEmail, String otpCode) {
         Properties props = new Properties();
         props.put("mail.smtp.auth", "true");
@@ -680,7 +651,6 @@ public class ServerApp {
         props.put("mail.smtp.starttls.required", "true");
         props.put("mail.smtp.host", "smtp.gmail.com");
         props.put("mail.smtp.port", "587");
-        // Ep dung dung chuan TLS 1.2 - javax.mail ban cu doi khi tu thuong luong sai chuan voi Gmail hien tai, gay loi [EOF]
         props.put("mail.smtp.ssl.protocols", "TLSv1.2");
         props.put("mail.smtp.connectiontimeout", "10000");
         props.put("mail.smtp.timeout", "10000");
@@ -728,8 +698,32 @@ public class ServerApp {
         } catch (SQLException e) { return false; }
     }
 
+    private static String[] getProfile(String user) {
+        String sql = "SELECT full_name, dob, university, email, phone FROM users WHERE username = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            if (conn == null) return new String[]{"", "", "", "", ""};
+            pstmt.setString(1, user);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return new String[]{
+                        nullToEmpty(rs.getString("full_name")),
+                        nullToEmpty(rs.getString("dob")),
+                        nullToEmpty(rs.getString("university")),
+                        nullToEmpty(rs.getString("email")),
+                        nullToEmpty(rs.getString("phone"))
+                    };
+                }
+            }
+        } catch (SQLException e) { /* tra ve rong neu loi */ }
+        return new String[]{"", "", "", "", ""};
+    }
+
+    private static String nullToEmpty(String s) {
+        return s == null ? "" : s;
+    }
+
     private static String createGroup(String groupName, String creator) {
-        // Logic mẫu thêm phòng chat vào Database hệ thống
         String sql = "INSERT INTO chat_groups (group_name, creator) VALUES (?, ?)";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -738,7 +732,6 @@ public class ServerApp {
             pstmt.setString(2, creator);
             return pstmt.executeUpdate() > 0 ? "OK" : "DBERROR";
         } catch (SQLException e) {
-            // Ma loi 2627/2601 = vi pham UNIQUE/PRIMARY KEY -> ten nhom nay da ton tai roi
             if (e.getErrorCode() == 2627 || e.getErrorCode() == 2601) {
                 return "EXISTS";
             }
@@ -748,7 +741,6 @@ public class ServerApp {
     }
 
     private static boolean joinGroup(String groupName, String user) {
-        // Logic mẫu gán thành viên gia nhập phòng chat
         String sql = "INSERT INTO group_members (group_name, username) VALUES (?, ?)";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -810,7 +802,6 @@ public class ServerApp {
 
     private static List<String> getDmContactsOfUser(String user) {
         List<String> result = new ArrayList<>();
-        // Lay danh sach nhung nguoi da tung nhan tin rieng (1-1) qua lai voi user nay
         String sql = "SELECT DISTINCT CASE WHEN sender = ? THEN receiver ELSE sender END AS other_user " +
                      "FROM messages WHERE group_name IS NULL AND (sender = ? OR receiver = ?)";
         try (Connection conn = DatabaseConnection.getConnection();
@@ -847,7 +838,6 @@ public class ServerApp {
         } catch (SQLException e) { return false; }
     }
 
-    // Giong saveMessage nhung tra ve ID vua sinh ra, de sau nay con cap nhat status (DELIVERED/SEEN) cho dung dong
     private static int saveMessageAndGetId(String sender, String receiver, String groupName, String content, String msgType) {
         String sql = "INSERT INTO messages (sender, receiver, group_name, content, msg_type) VALUES (?, ?, ?, ?, ?)";
         try (Connection conn = DatabaseConnection.getConnection();
@@ -879,7 +869,6 @@ public class ServerApp {
         } catch (SQLException e) { return false; }
     }
 
-    // Danh dau toan bo tin nhan tu "otherUser" gui cho "me" la DA XEM. Tra ve so dong thuc su bi cap nhat (>0 moi can bao lai cho nguoi gui)
     private static int markSeen(String otherUser, String me) {
         String sql = "UPDATE messages SET status = 'SEEN' WHERE sender = ? AND receiver = ? AND status <> 'SEEN'";
         try (Connection conn = DatabaseConnection.getConnection();
@@ -891,7 +880,6 @@ public class ServerApp {
         } catch (SQLException e) { return 0; }
     }
 
-    // Lay trang thai cua tin nhan CUOI CUNG ma "me" gui cho "otherUser", de khoi phuc dung tem trang thai khi mo lai doan chat
     private static String getLastOwnMessageStatus(String me, String otherUser) {
         String sql = "SELECT TOP 1 status FROM messages WHERE sender = ? AND receiver = ? ORDER BY id DESC";
         try (Connection conn = DatabaseConnection.getConnection();
@@ -906,8 +894,6 @@ public class ServerApp {
         return "NONE";
     }
 
-    // Thực hiện query gom tin nhắn cũ từ bảng messages trong SQL Server
-    // Trả về một chuỗi nối bằng dấu gạch đứng '|' để Client tự tách thành từng dòng
     private static String fetchChatHistory(String currentUser, String context) {
         StringBuilder sb = new StringBuilder();
         boolean group = isGroup(context);
@@ -934,7 +920,6 @@ public class ServerApp {
                     String sender = rs.getString("sender");
                     String content = rs.getString("content");
                     if ("FILE".equals(msgType)) {
-                        // Chi hien ten file trong lich su text, khong hien base64 (qua dai, gay xung dot dau phan cach)
                         String fileName = content.contains("‖") ? content.substring(0, content.indexOf("‖")) : content;
                         sb.append(sender).append(": [File] ").append(fileName);
                     } else if ("STICKER".equals(msgType)) {

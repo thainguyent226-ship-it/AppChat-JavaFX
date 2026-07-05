@@ -4,6 +4,8 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
+import src.client.EncryptedReader;
+import src.client.EncryptedWriter;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -37,8 +39,8 @@ public class LoginController {
             System.out.println("[CLIENT] Đang kết nối tới Server để đăng nhập...");
             Socket socket = new Socket(src.client.AppConfig.SERVER_HOST, src.client.AppConfig.SERVER_PORT);
 
-            PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            PrintWriter out = new EncryptedWriter(socket.getOutputStream());
+            BufferedReader in = new EncryptedReader(socket.getInputStream());
 
             String loginPackage = "LOGIN;" + username + ";" + password;
             out.println(loginPackage);

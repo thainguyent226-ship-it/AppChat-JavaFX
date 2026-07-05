@@ -3,6 +3,8 @@ package src.client.controller;
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import src.client.EncryptedReader;
+import src.client.EncryptedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -71,21 +73,14 @@ public class ChatController {
     private PrintWriter out;
     private BufferedReader in;
     private String currentUsername;
-    // Ghi nhớ những nhóm mà user hiện tại đang là thành viên, để biết gửi CHAT (1-1) hay GROUP_CHAT
+    private ProfileController activeProfileController;
     private final Set<String> myGroups = new HashSet<>();
-    // Những hội thoại đang có tin nhắn chưa đọc (chưa được mở xem) -> hiện chấm đỏ
     private final Set<String> unreadChats = new HashSet<>();
-    // Những bạn bè thật (đã accept) đang online -> hiện chấm xanh
     private final Set<String> onlineFriends = new HashSet<>();
-    // Theo dõi nhãn trạng thái (Đã gửi/Đã nhận/Đã xem) của tin nhắn CUỐI CÙNG mình gửi trong đoạn chat đang mở
     private Label currentStatusLabel;
     private String currentStatusContext;
-    // Có lời mời kết bạn mới chưa xem hay không -> đổi màu nút chuông
     private boolean hasPendingFriendRequest = false;
-    // Danh sách sticker: mỗi mã ứng với 1 hình vẽ vector (Circle/Polygon/Path) - KHÔNG dùng chữ/emoji nên
-    // chắc chắn 100% hiện đúng trên mọi máy, không phụ thuộc font hệ thống có hỗ trợ hay không
     private static final String[] STICKER_CODES = {"smile", "sad", "heart", "star", "like", "fire"};
-    // Bảng màu cố định để avatar cùng 1 người luôn cùng 1 màu
     private static final String[] AVATAR_COLORS = {
         "#0084ff", "#9b59b6", "#e67e22", "#16a085", "#e74c3c", "#2c3e50", "#f39c12", "#8e44ad"
     };
@@ -95,8 +90,8 @@ public class ChatController {
         this.currentUsername = username;
         
         try {
-            this.out = new PrintWriter(socket.getOutputStream(), true);
-            this.in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            this.out = new EncryptedWriter(socket.getOutputStream());
+            this.in = new EncryptedReader(socket.getInputStream());
             new Thread(new ReceiverThread()).start();
             out.println("GET_MY_CHATS"); // khoi phuc lai danh sach nhom + nguoi da tung chat
             System.out.println("[CLIENT] Da kich hoat luong nghe tin nhan ngam.");
@@ -107,12 +102,9 @@ public class ChatController {
 
     @FXML
     public void initialize() {
-        // Danh sách bắt đầu trống - dùng ô "Thêm liên hệ" phía trên để thêm username thật cần chat
 
-        // Gắn icon bánh răng vẽ bằng hình vector (không dùng emoji) cho nút Cài đặt
-        btnSettings.setGraphic(buildGearIcon(18));
+        btnSettings.setGraphic(buildGearIcon(20));
 
-        // Vẽ mỗi dòng trong danh sách liên hệ dạng: (avatar tròn màu, có chấm xanh online) + tên + (chấm đỏ nếu có tin chưa đọc)
         listFriends.setCellFactory(list -> new ListCell<String>() {
             private final Circle avatar = new Circle(18);
             private final Label initialLabel = new Label();
@@ -172,13 +164,10 @@ public class ChatController {
         });
     }
 
-    // Sinh 1 màu cố định cho mỗi tên (cùng 1 tên luôn ra cùng 1 màu avatar)
     private String colorForName(String name) {
         int index = Math.abs(name.hashCode()) % AVATAR_COLORS.length;
         return AVATAR_COLORS[index];
     }
-
-    // ================= CÁC HÀM VẼ BONG BÓNG CHAT (kiểu Messenger) =================
 
     private void clearMessages() {
         vboxMessages.getChildren().clear();
@@ -188,9 +177,6 @@ public class ChatController {
         Platform.runLater(() -> scrollChat.setVvalue(1.0));
     }
 
-    // isMe = true -> bong bóng xanh, nằm bên phải (tin của mình)
-    // isMe = false -> bong bóng xám, nằm bên trái (tin của người khác), kèm tên người gửi phía trên
-    // statusText != null (chỉ áp dụng cho tin của mình) -> hiện thêm nhãn nhỏ "Đã gửi/Đã nhận/Đã xem" dưới bong bóng, trả về Label đó để cập nhật sau
     private Label addMessageBubble(String sender, String content, boolean isMe, String statusText) {
         HBox row = new HBox();
         row.setAlignment(isMe ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
@@ -227,7 +213,6 @@ public class ChatController {
         return statusLabel;
     }
 
-    // Chuyển mã trạng thái từ server thành chữ hiển thị tiếng Việt
     private String statusLabelText(String status) {
         switch (status) {
             case "SENT": return "Đã gửi";
@@ -237,7 +222,6 @@ public class ChatController {
         }
     }
 
-    // Thông báo hệ thống hiển thị dạng viên thuốc xám căn giữa (vd: cảnh báo, thông báo lỗi nhẹ)
     private void addSystemNotice(String text) {
         HBox row = new HBox();
         row.setAlignment(Pos.CENTER);
@@ -274,7 +258,6 @@ public class ChatController {
     }
 
    
-    // Gửi lời mời kết bạn thật - chỉ khi người kia đồng ý (ACCEPT) thì mới xuất hiện trong danh sách của cả 2 bên
     @FXML
     private void handleAddContact() {
         String contact = txtAddContact.getText().trim();
@@ -290,7 +273,6 @@ public class ChatController {
         txtAddContact.clear();
     }
 
-    // Mở popup danh sách lời mời kết bạn đang chờ, có nút Chấp nhận / Từ chối
     @FXML
     private void handleShowFriendRequests() {
         hasPendingFriendRequest = false;
@@ -338,8 +320,6 @@ public class ChatController {
         dialog.show();
     }
 
-    // Mở dialog "Tạo nhóm mới" - việc vào nhóm giờ CHỈ thực hiện qua được người khác mời (menu Cài đặt -> Thêm thành viên),
-    // không cho tự join bằng cách gõ tên nhóm nữa, để tránh ai cũng vào được nhóm chỉ vì biết tên
     @FXML
     private void handleShowGroupDialog() {
         Stage dialog = new Stage();
@@ -377,7 +357,6 @@ public class ChatController {
         dialog.show();
     }
 
-    // Gửi file đính kèm, giới hạn tối đa 1MB
     @FXML
     private void handleSendFile() {
         String targetUser = listFriends.getSelectionModel().getSelectedItem();
@@ -411,7 +390,6 @@ public class ChatController {
         }
     }
 
-    // Mở bảng chọn sticker dạng lưới nổi lên trên nút, giống sticker tray của Messenger
     @FXML
     private void handleShowStickerPicker() {
         String targetUser = listFriends.getSelectionModel().getSelectedItem();
@@ -454,7 +432,6 @@ public class ChatController {
         popup.show(btnSticker, bounds.getMinX() - 90, bounds.getMinY() - 140);
     }
 
-    // Vẽ bong bóng file đính kèm - hiện ảnh trực tiếp nếu là file ảnh (giống Messenger), card đẹp cho file khác
     private void addFileBubble(String sender, String fileName, String base64Data, boolean isMe) {
         HBox row = new HBox();
         row.setAlignment(isMe ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
@@ -493,7 +470,6 @@ public class ChatController {
 
                 bubbleBox.getChildren().add(imageView);
             } catch (Exception ex) {
-                // Neu anh loi khong doc duoc, hien card file thuong thay the
                 bubbleBox.getChildren().add(buildFileCard(fileName, base64Data, isMe));
             }
         } else {
@@ -505,7 +481,6 @@ public class ChatController {
         scrollToBottom();
     }
 
-    // Card file đính kèm kiểu Messenger: icon theo loại file + tên + dung lượng + nút tải tròn
     private HBox buildFileCard(String fileName, String base64Data, boolean isMe) {
         String ext = fileName.contains(".") ? fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase() : "";
 
@@ -540,7 +515,6 @@ public class ChatController {
         return card;
     }
 
-    // Chọn icon hiển thị theo phần đuôi mở rộng của file, giống Messenger phân loại file
     private String fileIconFor(String ext) {
         switch (ext) {
             case "pdf": return "PDF";
@@ -555,7 +529,6 @@ public class ChatController {
         }
     }
 
-    // Ước lượng dung lượng gốc từ độ dài chuỗi Base64 (Base64 dài hơn gốc khoảng 4/3 lần)
     private String formatFileSize(String base64Data) {
         long approxBytes = (long) (base64Data.length() * 0.75);
         if (approxBytes < 1024) return approxBytes + " B";
@@ -577,35 +550,31 @@ public class ChatController {
         }
     }
 
-    // Icon bánh răng (Settings) vẽ bằng hình vector: 8 răng cưa (hình chữ nhật xoay quanh tâm) + thân tròn + lỗ tròn giữa
     private Node buildGearIcon(double size) {
         double cx = size / 2, cy = size / 2;
-        double bodyR = size * 0.30;
-        double toothW = size * 0.16, toothH = size * 0.20;
+        double bodyR = size * 0.32;
+        double toothW = size * 0.20, toothH = size * 0.22;
 
         Group teeth = new Group();
-        for (int i = 0; i < 8; i++) {
-            Rectangle tooth = new Rectangle(toothW, toothH, Color.web("#65676b"));
-            tooth.setArcWidth(2);
-            tooth.setArcHeight(2);
-            tooth.setLayoutX(-toothW / 2);
-            tooth.setLayoutY(-bodyR - toothH * 0.55);
-            Rotate rotate = new Rotate(i * 45);
-            tooth.getTransforms().add(rotate);
-            tooth.setTranslateX(cx);
-            tooth.setTranslateY(cy);
+        for (int i = 0; i < 6; i++) {
+            Rectangle tooth = new Rectangle(-toothW / 2, -bodyR - toothH * 0.65, toothW, toothH);
+            tooth.setFill(Color.web("#65676b"));
+            tooth.setArcWidth(3);
+            tooth.setArcHeight(3);
+            tooth.getTransforms().add(new Rotate(i * 60, 0, 0));
             teeth.getChildren().add(tooth);
         }
+        teeth.setTranslateX(cx);
+        teeth.setTranslateY(cy);
 
         Circle body = new Circle(cx, cy, bodyR, Color.web("#65676b"));
-        Circle hole = new Circle(cx, cy, bodyR * 0.42, Color.web("#f0f2f5"));
+        Circle hole = new Circle(cx, cy, bodyR * 0.45, Color.web("#f0f2f5"));
 
         Pane pane = new Pane(teeth, body, hole);
         pane.setPrefSize(size, size);
         return pane;
     }
 
-    // Vẽ bong bóng sticker bằng hình vector (không dùng chữ/emoji), có đổ bóng nhẹ giống sticker thật
     private void addStickerBubble(String stickerId, boolean isMe) {
         HBox row = new HBox();
         row.setAlignment(isMe ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
@@ -616,7 +585,6 @@ public class ChatController {
         scrollToBottom();
     }
 
-    // Tra đúng hàm vẽ ứng với ID sticker, trả về hình mặt cười mặc định nếu ID lạ (vd sticker cũ đã đổi danh sách)
     private Node createStickerNode(String stickerId, double size) {
         switch (stickerId) {
             case "smile": return buildFaceSticker(size, Color.web("#f1c40f"), true);
@@ -629,7 +597,6 @@ public class ChatController {
         }
     }
 
-    // Mặt cười / mặt buồn: hình tròn nền màu + 2 mắt chấm tròn + miệng vẽ bằng cung tròn (Arc)
     private Node buildFaceSticker(double size, Color color, boolean happy) {
         Pane pane = new Pane();
         pane.setPrefSize(size, size);
@@ -649,7 +616,6 @@ public class ChatController {
         return pane;
     }
 
-    // Trái tim: ghép 2 hình tròn (2 nửa trên) + 1 tam giác (nửa dưới nhọn)
     private Node buildHeartSticker(double size) {
         Pane pane = new Pane();
         pane.setPrefSize(size, size);
@@ -666,7 +632,6 @@ public class ChatController {
         return pane;
     }
 
-    // Ngôi sao 5 cánh: tính toạ độ 10 đỉnh (5 đỉnh nhọn xen kẽ 5 đỉnh lõm) bằng lượng giác
     private Node buildStarSticker(double size) {
         Pane pane = new Pane();
         pane.setPrefSize(size, size);
@@ -685,7 +650,6 @@ public class ChatController {
         return pane;
     }
 
-    // Nút "Thích": hình tròn nền xanh + dấu check trắng vẽ bằng Polyline
     private Node buildLikeSticker(double size) {
         Pane pane = new Pane();
         pane.setPrefSize(size, size);
@@ -703,7 +667,6 @@ public class ChatController {
         return pane;
     }
 
-    // Ngọn lửa: vẽ bằng Path với các đường cong Bezier (CubicCurveTo)
     private Node buildFireSticker(double size) {
         Pane pane = new Pane();
         pane.setPrefSize(size, size);
@@ -720,7 +683,6 @@ public class ChatController {
         return pane;
     }
 
-    // Menu cài đặt gộp chung: Thêm thành viên (chỉ hiện khi đang xem nhóm) / Rời nhóm / Sửa thông tin / Đăng xuất
     @FXML
     private void handleShowSettingsMenu(ActionEvent event) {
         ContextMenu menu = new ContextMenu();
@@ -748,7 +710,6 @@ public class ChatController {
         menu.show(btnSettings, javafx.geometry.Side.TOP, 0, 0);
     }
 
-    // Mời thẳng 1 username vào nhóm đang chọn - không cần người kia phải tự gõ tên nhóm để tham gia
     private void handleInviteToGroup(String groupName) {
         TextInputDialog dialog = new TextInputDialog();
         dialog.setTitle("Thêm thành viên");
@@ -780,11 +741,14 @@ public class ChatController {
 
             ProfileController controller = loader.getController();
             controller.initData(this.out, this.currentUsername);
+            this.activeProfileController = controller;
+            out.println("GET_PROFILE;" + currentUsername);
 
             Stage stage = new Stage();
             stage.initModality(Modality.APPLICATION_MODAL);
             stage.setTitle("Cập nhật thông tin tài khoản");
             stage.setScene(new Scene(root));
+            stage.setOnHidden(e -> activeProfileController = null);
             stage.show();
         } catch (Exception e) {
             System.out.println("[ERROR] Khong the mo ProfileView.fxml: " + e.getMessage());
@@ -989,10 +953,8 @@ public class ChatController {
                             String content = data[2];
                             String selected = listFriends.getSelectionModel().getSelectedItem();
                             if (!listFriends.getItems().contains(fromUser)) {
-                                // Người lạ chưa có trong danh sách -> thêm vào để không mất tin nhắn
                                 listFriends.getItems().add(fromUser);
                             }
-                            // Chỉ vẽ bong bóng nếu đang mở đúng đoạn chat với người gửi này
                             if (fromUser.equals(selected)) {
                                 addMessageBubble(fromUser, content, false, null);
                             } else {
@@ -1041,7 +1003,6 @@ public class ChatController {
                             String context = data.length > 1 ? data[1] : "";
                             String content = data.length > 2 ? data[2] : "";
                             String myLastStatus = data.length > 3 ? data[3] : "NONE";
-                            // Chỉ hiển thị nếu vẫn đang chọn đúng hội thoại đó (tránh đè nhầm khi user bấm chuyển qua lại nhanh)
                             String selected = listFriends.getSelectionModel().getSelectedItem();
                             if (context.equals(selected)) {
                                 clearMessages();
@@ -1056,7 +1017,11 @@ public class ChatController {
                                         String text = parts.length > 1 ? parts[1] : line;
                                         boolean isMe = sender.equals(currentUsername);
                                         boolean isLast = (i == lines.length - 1);
-                                        if (isMe && isLast && !"NONE".equals(myLastStatus)) {
+                                        if (text.startsWith("[Sticker] ")) {
+                                            addStickerBubble(text.substring(10).trim(), isMe);
+                                        } else if (text.startsWith("[File] ")) {
+                                            addSystemNotice((isMe ? "Bạn" : sender) + " đã gửi file: " + text.substring(7).trim() + " (lịch sử cũ, không tải lại được)");
+                                        } else if (isMe && isLast && !"NONE".equals(myLastStatus)) {
                                             currentStatusLabel = addMessageBubble(sender, text, true, statusLabelText(myLastStatus));
                                         } else {
                                             addMessageBubble(sender, text, isMe, null);
@@ -1076,10 +1041,24 @@ public class ChatController {
                             }
                         }
                         else if ("UPDATE_PROFILE_SUCCESS".equals(msgFromServer)) {
-                            showAlert(Alert.AlertType.INFORMATION, "Thanh cong", "He thong da luu thong tin ca nhan moi vao SQL Server!");
+                            if (activeProfileController != null) {
+                                activeProfileController.onSaveSuccess();
+                            } else {
+                                showAlert(Alert.AlertType.INFORMATION, "Thành công", "Hệ thống đã lưu thông tin cá nhân mới!");
+                            }
                         }
                         else if ("UPDATE_PROFILE_FAILED".equals(msgFromServer)) {
-                            showAlert(Alert.AlertType.ERROR, "That bai", "Loi! Khong the cap nhat thong tin ca nhan.");
+                            if (activeProfileController != null) {
+                                activeProfileController.onSaveFailed();
+                            } else {
+                                showAlert(Alert.AlertType.ERROR, "Thất bại", "Lỗi! Không thể cập nhật thông tin cá nhân.");
+                            }
+                        }
+                        else if (msgFromServer.startsWith("PROFILE_DATA;")) {
+                            String[] data = msgFromServer.split(";", -1);
+                            if (activeProfileController != null && data.length >= 6) {
+                                activeProfileController.populateFields(data[1], data[2], data[3], data[4], data[5]);
+                            }
                         }
                         else if ("VERIFY_OTP_SUCCESS".equals(msgFromServer)) {
                             showAlert(Alert.AlertType.INFORMATION, "Thanh cong", "Xac thuc email thanh cong!");
