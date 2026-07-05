@@ -20,6 +20,8 @@ import javafx.fxml.FXMLLoader;
 import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Group;
+import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
@@ -27,13 +29,24 @@ import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.Arc;
+import javafx.scene.shape.ArcType;
 import javafx.scene.shape.Circle;
+import javafx.scene.shape.CubicCurveTo;
+import javafx.scene.shape.MoveTo;
+import javafx.scene.shape.Path;
+import javafx.scene.shape.Polygon;
+import javafx.scene.shape.Polyline;
 import javafx.scene.shape.Rectangle;
+import javafx.scene.shape.StrokeLineCap;
+import javafx.scene.shape.StrokeLineJoin;
+import javafx.scene.transform.Rotate;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Popup;
@@ -69,10 +82,9 @@ public class ChatController {
     private String currentStatusContext;
     // Có lời mời kết bạn mới chưa xem hay không -> đổi màu nút chuông
     private boolean hasPendingFriendRequest = false;
-    // Danh sách sticker demo: dùng ký hiệu Unicode đơn giản (không phải emoji màu) để không phụ thuộc font đặc biệt,
-    // hầu như mọi máy Windows đều có sẵn font hiển thị được nhóm ký tự này -> chắc chắn hiện ra hình, không bị vỡ chữ
-    private static final String[] STICKER_CODES = {"♥", "★", "☺", "☹", "✓", "♪", "☀", "✈"};
-    private static final String[] STICKER_COLORS = {"#e74c3c", "#f39c12", "#f1c40f", "#3498db", "#27ae60", "#9b59b6", "#e67e22", "#16a085"};
+    // Danh sách sticker: mỗi mã ứng với 1 hình vẽ vector (Circle/Polygon/Path) - KHÔNG dùng chữ/emoji nên
+    // chắc chắn 100% hiện đúng trên mọi máy, không phụ thuộc font hệ thống có hỗ trợ hay không
+    private static final String[] STICKER_CODES = {"smile", "sad", "heart", "star", "like", "fire"};
     // Bảng màu cố định để avatar cùng 1 người luôn cùng 1 màu
     private static final String[] AVATAR_COLORS = {
         "#0084ff", "#9b59b6", "#e67e22", "#16a085", "#e74c3c", "#2c3e50", "#f39c12", "#8e44ad"
@@ -96,6 +108,9 @@ public class ChatController {
     @FXML
     public void initialize() {
         // Danh sách bắt đầu trống - dùng ô "Thêm liên hệ" phía trên để thêm username thật cần chat
+
+        // Gắn icon bánh răng vẽ bằng hình vector (không dùng emoji) cho nút Cài đặt
+        btnSettings.setGraphic(buildGearIcon(18));
 
         // Vẽ mỗi dòng trong danh sách liên hệ dạng: (avatar tròn màu, có chấm xanh online) + tên + (chấm đỏ nếu có tin chưa đọc)
         listFriends.setCellFactory(list -> new ListCell<String>() {
@@ -128,7 +143,7 @@ public class ChatController {
                 } else {
                     boolean isGroup = myGroups.contains(item);
                     avatar.setFill(Color.web(isGroup ? "#7c3aed" : colorForName(item)));
-                    initialLabel.setText(isGroup ? "👥" : String.valueOf(item.charAt(0)).toUpperCase());
+                    initialLabel.setText(isGroup ? "G" : String.valueOf(item.charAt(0)).toUpperCase());
                     initialLabel.setStyle(isGroup
                         ? "-fx-font-size: 13px;"
                         : "-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 14px;");
@@ -146,7 +161,7 @@ public class ChatController {
 
         listFriends.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
             if (newValue != null) {
-                lblChattingWith.setText("💬" + newValue);
+                lblChattingWith.setText("Đang chat với: " + newValue);
                 clearMessages();
                 unreadChats.remove(newValue);
                 listFriends.refresh();
@@ -303,9 +318,9 @@ public class ChatController {
             nameLabel.setStyle("-fx-font-size: 13px; -fx-font-family: 'Segoe UI';");
             Region spacer = new Region();
             HBox.setHgrow(spacer, Priority.ALWAYS);
-            Button acceptBtn = new Button("✔ Chấp nhận");
+            Button acceptBtn = new Button("Chấp nhận");
             acceptBtn.setStyle("-fx-background-color: #e7fff0; -fx-text-fill: #16a085; -fx-font-weight: bold; -fx-cursor: hand;");
-            Button rejectBtn = new Button("✘ Từ chối");
+            Button rejectBtn = new Button("Từ chối");
             rejectBtn.setStyle("-fx-background-color: #fdeaea; -fx-text-fill: #e74c3c; -fx-font-weight: bold; -fx-cursor: hand;");
             acceptBtn.setOnAction(e -> {
                 out.println("ACCEPT_FRIEND;" + requester);
@@ -323,7 +338,7 @@ public class ChatController {
         dialog.show();
     }
 
-    // Mở dialog "Tạo nhóm mới" - việc vào nhóm giờ CHỈ thực hiện qua được người khác mời (menu ⚙ -> Thêm thành viên),
+    // Mở dialog "Tạo nhóm mới" - việc vào nhóm giờ CHỈ thực hiện qua được người khác mời (menu Cài đặt -> Thêm thành viên),
     // không cho tự join bằng cách gõ tên nhóm nữa, để tránh ai cũng vào được nhóm chỉ vì biết tên
     @FXML
     private void handleShowGroupDialog() {
@@ -338,16 +353,12 @@ public class ChatController {
         Label title = new Label("Tạo nhóm chat mới");
         title.setStyle("-fx-font-size: 15px; -fx-font-weight: bold; -fx-font-family: 'Segoe UI'; -fx-text-fill: #050505;");
 
-        Label subtitle = new Label("Sau khi tạo, vào menu ⚙ ở góc dưới sidebar để mời thêm thành viên.");
-        subtitle.setWrapText(true);
-        subtitle.setStyle("-fx-font-size: 11.5px; -fx-font-family: 'Segoe UI'; -fx-text-fill: #65676b;");
-
         TextField txtName = new TextField();
         txtName.setPromptText("Nhập tên nhóm...");
         txtName.setPrefHeight(38);
         txtName.setStyle("-fx-background-color: #f0f2f5; -fx-background-radius: 8; -fx-font-size: 13px; -fx-border-color: transparent;");
 
-        Button createBtn = new Button("➕  Tạo nhóm mới");
+        Button createBtn = new Button("Tạo nhóm mới");
         createBtn.setMaxWidth(Double.MAX_VALUE);
         createBtn.setPrefHeight(38);
         createBtn.setStyle("-fx-background-color: #0084ff; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 10; -fx-cursor: hand; -fx-font-size: 13px;");
@@ -361,7 +372,7 @@ public class ChatController {
             dialog.close();
         });
 
-        root.getChildren().addAll(title, subtitle, txtName, createBtn);
+        root.getChildren().addAll(title, txtName, createBtn);
         dialog.setScene(new Scene(root, 340, 210));
         dialog.show();
     }
@@ -420,22 +431,20 @@ public class ChatController {
                 "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.25), 14, 0, 0, 4);");
 
         int col = 0, row = 0;
-        for (int i = 0; i < STICKER_CODES.length; i++) {
-            String code = STICKER_CODES[i];
-            String colorHex = STICKER_COLORS[i % STICKER_COLORS.length];
-            Button btn = new Button(code);
-            btn.setPrefSize(46, 46);
-            String normalStyle = "-fx-background-color: transparent; -fx-font-size: 26px; -fx-text-fill: " + colorHex + "; -fx-cursor: hand; -fx-background-radius: 10;";
-            String hoverStyle = "-fx-background-color: #f0f2f5; -fx-font-size: 26px; -fx-text-fill: " + colorHex + "; -fx-cursor: hand; -fx-background-radius: 10;";
-            btn.setStyle(normalStyle);
-            btn.setOnMouseEntered(e -> btn.setStyle(hoverStyle));
-            btn.setOnMouseExited(e -> btn.setStyle(normalStyle));
-            btn.setOnAction(e -> {
-                out.println("STICKER;" + targetUser + ";" + code);
-                addStickerBubble(code, true);
+        for (String stickerId : STICKER_CODES) {
+            StackPane cell = new StackPane(createStickerNode(stickerId, 40));
+            cell.setPrefSize(46, 46);
+            String normalStyle = "-fx-background-color: transparent; -fx-cursor: hand; -fx-background-radius: 10;";
+            String hoverStyle = "-fx-background-color: #f0f2f5; -fx-cursor: hand; -fx-background-radius: 10;";
+            cell.setStyle(normalStyle);
+            cell.setOnMouseEntered(e -> cell.setStyle(hoverStyle));
+            cell.setOnMouseExited(e -> cell.setStyle(normalStyle));
+            cell.setOnMouseClicked(e -> {
+                out.println("STICKER;" + targetUser + ";" + stickerId);
+                addStickerBubble(stickerId, true);
                 popup.hide();
             });
-            grid.add(btn, col, row);
+            grid.add(cell, col, row);
             col++;
             if (col == 4) { col = 0; row++; }
         }
@@ -507,7 +516,8 @@ public class ChatController {
                 " -fx-background-radius: 14; -fx-padding: 10 12 10 12;");
 
         Label iconLabel = new Label(fileIconFor(ext));
-        iconLabel.setStyle("-fx-font-size: 26px;");
+        iconLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-text-fill: white; -fx-background-color: #0084ff; " +
+                "-fx-background-radius: 6; -fx-padding: 4 6 4 6; -fx-font-family: 'Segoe UI';");
 
         VBox textBox = new VBox(2);
         Label nameLabel = new Label(fileName);
@@ -521,9 +531,9 @@ public class ChatController {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        Button downloadBtn = new Button("⬇");
-        downloadBtn.setPrefSize(30, 30);
-        downloadBtn.setStyle("-fx-background-color: #0084ff; -fx-text-fill: white; -fx-background-radius: 15; -fx-font-weight: bold; -fx-cursor: hand;");
+        Button downloadBtn = new Button("Tải");
+        downloadBtn.setPrefSize(44, 28);
+        downloadBtn.setStyle("-fx-background-color: #0084ff; -fx-text-fill: white; -fx-background-radius: 14; -fx-font-weight: bold; -fx-font-size: 10.5px; -fx-cursor: hand;");
         downloadBtn.setOnAction(e -> saveFileToDisk(fileName, base64Data));
 
         card.getChildren().addAll(iconLabel, textBox, spacer, downloadBtn);
@@ -533,15 +543,15 @@ public class ChatController {
     // Chọn icon hiển thị theo phần đuôi mở rộng của file, giống Messenger phân loại file
     private String fileIconFor(String ext) {
         switch (ext) {
-            case "pdf": return "📕";
-            case "doc": case "docx": return "📝";
-            case "xls": case "xlsx": return "📊";
-            case "ppt": case "pptx": return "📽️";
-            case "zip": case "rar": case "7z": return "🗜️";
-            case "mp3": case "wav": case "m4a": return "🎵";
-            case "mp4": case "avi": case "mov": case "mkv": return "🎬";
-            case "txt": return "📄";
-            default: return "📁";
+            case "pdf": return "PDF";
+            case "doc": case "docx": return "DOC";
+            case "xls": case "xlsx": return "XLS";
+            case "ppt": case "pptx": return "PPT";
+            case "zip": case "rar": case "7z": return "ZIP";
+            case "mp3": case "wav": case "m4a": return "MP3";
+            case "mp4": case "avi": case "mov": case "mkv": return "MP4";
+            case "txt": return "TXT";
+            default: return "FILE";
         }
     }
 
@@ -567,23 +577,147 @@ public class ChatController {
         }
     }
 
-    // Vẽ bong bóng sticker (ký hiệu cỡ lớn, tô màu riêng, không nền, giống sticker thật của Messenger)
-    private void addStickerBubble(String stickerCode, boolean isMe) {
+    // Icon bánh răng (Settings) vẽ bằng hình vector: 8 răng cưa (hình chữ nhật xoay quanh tâm) + thân tròn + lỗ tròn giữa
+    private Node buildGearIcon(double size) {
+        double cx = size / 2, cy = size / 2;
+        double bodyR = size * 0.30;
+        double toothW = size * 0.16, toothH = size * 0.20;
+
+        Group teeth = new Group();
+        for (int i = 0; i < 8; i++) {
+            Rectangle tooth = new Rectangle(toothW, toothH, Color.web("#65676b"));
+            tooth.setArcWidth(2);
+            tooth.setArcHeight(2);
+            tooth.setLayoutX(-toothW / 2);
+            tooth.setLayoutY(-bodyR - toothH * 0.55);
+            Rotate rotate = new Rotate(i * 45);
+            tooth.getTransforms().add(rotate);
+            tooth.setTranslateX(cx);
+            tooth.setTranslateY(cy);
+            teeth.getChildren().add(tooth);
+        }
+
+        Circle body = new Circle(cx, cy, bodyR, Color.web("#65676b"));
+        Circle hole = new Circle(cx, cy, bodyR * 0.42, Color.web("#f0f2f5"));
+
+        Pane pane = new Pane(teeth, body, hole);
+        pane.setPrefSize(size, size);
+        return pane;
+    }
+
+    // Vẽ bong bóng sticker bằng hình vector (không dùng chữ/emoji), có đổ bóng nhẹ giống sticker thật
+    private void addStickerBubble(String stickerId, boolean isMe) {
         HBox row = new HBox();
         row.setAlignment(isMe ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
-        Label sticker = new Label(stickerCode);
-        sticker.setStyle("-fx-font-size: 56px; -fx-text-fill: " + colorForSticker(stickerCode) + "; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.15), 4, 0, 0, 2);");
+        Node sticker = createStickerNode(stickerId, 72);
+        sticker.setStyle("-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 6, 0, 0, 3);");
         row.getChildren().add(sticker);
         vboxMessages.getChildren().add(row);
         scrollToBottom();
     }
 
-    // Tra đúng màu ứng với mã sticker, mặc định màu xám nếu không tìm thấy (vd sticker cũ không còn trong danh sách)
-    private String colorForSticker(String code) {
-        for (int i = 0; i < STICKER_CODES.length; i++) {
-            if (STICKER_CODES[i].equals(code)) return STICKER_COLORS[i % STICKER_COLORS.length];
+    // Tra đúng hàm vẽ ứng với ID sticker, trả về hình mặt cười mặc định nếu ID lạ (vd sticker cũ đã đổi danh sách)
+    private Node createStickerNode(String stickerId, double size) {
+        switch (stickerId) {
+            case "smile": return buildFaceSticker(size, Color.web("#f1c40f"), true);
+            case "sad": return buildFaceSticker(size, Color.web("#5dade2"), false);
+            case "heart": return buildHeartSticker(size);
+            case "star": return buildStarSticker(size);
+            case "like": return buildLikeSticker(size);
+            case "fire": return buildFireSticker(size);
+            default: return buildFaceSticker(size, Color.web("#f1c40f"), true);
         }
-        return "#65676b";
+    }
+
+    // Mặt cười / mặt buồn: hình tròn nền màu + 2 mắt chấm tròn + miệng vẽ bằng cung tròn (Arc)
+    private Node buildFaceSticker(double size, Color color, boolean happy) {
+        Pane pane = new Pane();
+        pane.setPrefSize(size, size);
+        Circle face = new Circle(size / 2, size / 2, size / 2 - 2, color);
+        face.setStroke(color.darker());
+        face.setStrokeWidth(1.5);
+        Circle leftEye = new Circle(size * 0.35, size * 0.42, size * 0.06, Color.web("#2c3e50"));
+        Circle rightEye = new Circle(size * 0.65, size * 0.42, size * 0.06, Color.web("#2c3e50"));
+        Arc mouth = new Arc(size * 0.5, happy ? size * 0.55 : size * 0.68, size * 0.22, size * 0.16,
+                happy ? 200 : 20, happy ? 140 : -140);
+        mouth.setType(ArcType.OPEN);
+        mouth.setFill(Color.TRANSPARENT);
+        mouth.setStroke(Color.web("#2c3e50"));
+        mouth.setStrokeWidth(size * 0.05);
+        mouth.setStrokeLineCap(StrokeLineCap.ROUND);
+        pane.getChildren().addAll(face, leftEye, rightEye, mouth);
+        return pane;
+    }
+
+    // Trái tim: ghép 2 hình tròn (2 nửa trên) + 1 tam giác (nửa dưới nhọn)
+    private Node buildHeartSticker(double size) {
+        Pane pane = new Pane();
+        pane.setPrefSize(size, size);
+        double r = size * 0.28;
+        Circle left = new Circle(size * 0.35, size * 0.38, r, Color.web("#e74c3c"));
+        Circle right = new Circle(size * 0.65, size * 0.38, r, Color.web("#e74c3c"));
+        Polygon bottom = new Polygon(
+                size * 0.10, size * 0.42,
+                size * 0.90, size * 0.42,
+                size * 0.50, size * 0.94
+        );
+        bottom.setFill(Color.web("#e74c3c"));
+        pane.getChildren().addAll(left, right, bottom);
+        return pane;
+    }
+
+    // Ngôi sao 5 cánh: tính toạ độ 10 đỉnh (5 đỉnh nhọn xen kẽ 5 đỉnh lõm) bằng lượng giác
+    private Node buildStarSticker(double size) {
+        Pane pane = new Pane();
+        pane.setPrefSize(size, size);
+        Polygon star = new Polygon();
+        double cx = size / 2, cy = size / 2;
+        double outerR = size / 2 - 2, innerR = outerR * 0.45;
+        for (int i = 0; i < 10; i++) {
+            double angle = Math.PI / 2 + i * Math.PI / 5;
+            double r = (i % 2 == 0) ? outerR : innerR;
+            star.getPoints().addAll(cx + r * Math.cos(angle), cy - r * Math.sin(angle));
+        }
+        star.setFill(Color.web("#f1c40f"));
+        star.setStroke(Color.web("#f39c12"));
+        star.setStrokeWidth(1.5);
+        pane.getChildren().add(star);
+        return pane;
+    }
+
+    // Nút "Thích": hình tròn nền xanh + dấu check trắng vẽ bằng Polyline
+    private Node buildLikeSticker(double size) {
+        Pane pane = new Pane();
+        pane.setPrefSize(size, size);
+        Circle bg = new Circle(size / 2, size / 2, size / 2 - 2, Color.web("#3498db"));
+        Polyline check = new Polyline(
+                size * 0.28, size * 0.52,
+                size * 0.44, size * 0.68,
+                size * 0.74, size * 0.32
+        );
+        check.setStroke(Color.WHITE);
+        check.setStrokeWidth(size * 0.08);
+        check.setStrokeLineCap(StrokeLineCap.ROUND);
+        check.setStrokeLineJoin(StrokeLineJoin.ROUND);
+        pane.getChildren().addAll(bg, check);
+        return pane;
+    }
+
+    // Ngọn lửa: vẽ bằng Path với các đường cong Bezier (CubicCurveTo)
+    private Node buildFireSticker(double size) {
+        Pane pane = new Pane();
+        pane.setPrefSize(size, size);
+        Path flame = new Path();
+        flame.getElements().add(new MoveTo(size * 0.5, size * 0.05));
+        flame.getElements().add(new CubicCurveTo(size * 0.9, size * 0.35, size * 0.78, size * 0.6, size * 0.6, size * 0.58));
+        flame.getElements().add(new CubicCurveTo(size * 0.72, size * 0.42, size * 0.52, size * 0.38, size * 0.55, size * 0.55));
+        flame.getElements().add(new CubicCurveTo(size * 0.58, size * 0.7, size * 0.28, size * 0.68, size * 0.28, size * 0.88));
+        flame.getElements().add(new CubicCurveTo(size * 0.05, size * 0.68, size * 0.12, size * 0.28, size * 0.5, size * 0.05));
+        flame.setFill(Color.web("#e67e22"));
+        flame.setStroke(Color.web("#d35400"));
+        flame.setStrokeWidth(1);
+        pane.getChildren().add(flame);
+        return pane;
     }
 
     // Menu cài đặt gộp chung: Thêm thành viên (chỉ hiện khi đang xem nhóm) / Rời nhóm / Sửa thông tin / Đăng xuất
@@ -596,18 +730,18 @@ public class ChatController {
         boolean viewingGroup = selected != null && myGroups.contains(selected);
 
         if (viewingGroup) {
-            MenuItem addMemberItem = new MenuItem("👤➕  Thêm thành viên vào nhóm");
+            MenuItem addMemberItem = new MenuItem("+  Thêm thành viên vào nhóm");
             addMemberItem.setOnAction(e -> handleInviteToGroup(selected));
             menu.getItems().add(addMemberItem);
         }
 
-        MenuItem leaveGroupItem = new MenuItem("❌  Rời nhóm");
+        MenuItem leaveGroupItem = new MenuItem("Rời nhóm");
         leaveGroupItem.setOnAction(e -> handleLeaveGroup());
 
-        MenuItem editProfileItem = new MenuItem("👤  Sửa thông tin");
+        MenuItem editProfileItem = new MenuItem("Sửa thông tin");
         editProfileItem.setOnAction(e -> openProfileWindow(event));
 
-        MenuItem logoutItem = new MenuItem("🚪  Đăng xuất");
+        MenuItem logoutItem = new MenuItem("Đăng xuất");
         logoutItem.setOnAction(e -> handleLogout(event));
 
         menu.getItems().addAll(leaveGroupItem, editProfileItem, new SeparatorMenuItem(), logoutItem);
@@ -747,7 +881,7 @@ public class ChatController {
                             String[] data = msgFromServer.split(";", 2);
                             hasPendingFriendRequest = true;
                             btnFriendRequests.setStyle("-fx-background-color: #fdeaea; -fx-background-radius: 17; -fx-font-size: 15px; -fx-cursor: hand;");
-                            addSystemNotice("🔔 " + data[1] + " đã gửi cho bạn lời mời kết bạn. Bấm chuông để xem.");
+                            addSystemNotice(data[1] + " đã gửi cho bạn lời mời kết bạn. Bấm vào nút @ để xem.");
                         }
                         else if (msgFromServer.startsWith("ADD_FRIEND_SUCCESS;")) {
                             String[] data = msgFromServer.split(";", 2);
@@ -843,7 +977,7 @@ public class ChatController {
                         }
                         else if (msgFromServer.startsWith("SYSTEM_MSG;")) {
                             String[] data = msgFromServer.split(";", 2);
-                            showAlert(Alert.AlertType.INFORMATION, "📢 Thông báo hệ thống", data.length > 1 ? data[1] : "");
+                            showAlert(Alert.AlertType.INFORMATION, "» Thông báo hệ thống", data.length > 1 ? data[1] : "");
                         }
                         else if ("ACCOUNT_BLOCKED".equals(msgFromServer)) {
                             showAlert(Alert.AlertType.ERROR, "Tài khoản bị khóa", "Tài khoản của bạn đã bị quản trị viên khóa. Ứng dụng sẽ đăng xuất.");
@@ -983,7 +1117,7 @@ public class ChatController {
                             String[] data = msgFromServer.split(";");
                             listFriends.getItems().remove(data[1]);
                             myGroups.remove(data[1]);
-                            lblChattingWith.setText("💬 Đang chat với: Bạn bè");
+                            lblChattingWith.setText("Đang chat với: Bạn bè");
                             showAlert(Alert.AlertType.INFORMATION, "Thanh cong", "Da roi khoi nhom: " + data[1]);
                         }
                         else if ("LEAVE_GROUP_FAILED".equals(msgFromServer)) {
