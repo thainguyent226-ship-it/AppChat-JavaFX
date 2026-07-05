@@ -31,3 +31,17 @@
 [05/07/2026 00:19:58] LOGIN - user: thanh123
 [05/07/2026 00:20:29] LOGIN - user: thai123
 [05/07/2026 00:20:54] LOGOUT - user: thai123
+[05/07/2026 00:27:46] LOGIN - user: thanh123
+[05/07/2026 00:28:09] LOGIN - user: thai123
+[05/07/2026 20:22:53] LOGIN - user: thai123
+[05/07/2026 20:24:40] LOGIN - user: thanh123
+[05/07/2026 20:39:05] LOGOUT - user: thanh123
+[05/07/2026 20:39:31] LOGIN - user: thanh123
+[05/07/2026 20:47:22] LOGOUT - user: thai123
+[05/07/2026 20:47:34] LOGIN - user: thai123
+[05/07/2026 20:50:03] LOGOUT - user: thai123
+[05/07/2026 20:50:40] LOGIN - user: thai123
+[05/07/2026 20:50:58] CREATE_GROUP - user: thai123 - group: 3W
+[05/07/2026 20:51:13] INVITE_TO_GROUP - user: thai123 - them thuc123 vao nhom 3W
+[05/07/2026 20:51:26] INVITE_TO_GROUP - user: thai123 - them thanh123 vao nhom 3W
+[05/07/2026 20:52:33] LOGOUT - user: thai123

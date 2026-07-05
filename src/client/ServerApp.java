@@ -258,12 +258,15 @@ public class ServerApp {
                         case "CREATE_GROUP":
                             String creator = data[1];
                             String groupName = data[2];
-                            if (createGroup(groupName, creator)) {
+                            String createResult = createGroup(groupName, creator);
+                            if ("OK".equals(createResult)) {
                                 out.println("CREATE_GROUP_SUCCESS;" + groupName);
                                 System.out.println("[GROUP] Phong chat '" + groupName + "' da duoc tao boi " + creator);
                                 writeLog("CREATE_GROUP", creator, "group: " + groupName);
+                            } else if ("EXISTS".equals(createResult)) {
+                                out.println("CREATE_GROUP_FAILED;EXISTS");
                             } else {
-                                out.println("CREATE_GROUP_FAILED");
+                                out.println("CREATE_GROUP_FAILED;DBERROR");
                             }
                             break;
 
@@ -725,16 +728,23 @@ public class ServerApp {
         } catch (SQLException e) { return false; }
     }
 
-    private static boolean createGroup(String groupName, String creator) {
+    private static String createGroup(String groupName, String creator) {
         // Logic mẫu thêm phòng chat vào Database hệ thống
         String sql = "INSERT INTO chat_groups (group_name, creator) VALUES (?, ?)";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            if (conn == null) return false;
+            if (conn == null) return "DBERROR";
             pstmt.setString(1, groupName);
             pstmt.setString(2, creator);
-            return pstmt.executeUpdate() > 0;
-        } catch (SQLException e) { return false; }
+            return pstmt.executeUpdate() > 0 ? "OK" : "DBERROR";
+        } catch (SQLException e) {
+            // Ma loi 2627/2601 = vi pham UNIQUE/PRIMARY KEY -> ten nhom nay da ton tai roi
+            if (e.getErrorCode() == 2627 || e.getErrorCode() == 2601) {
+                return "EXISTS";
+            }
+            System.out.println("[DATABASE ERROR] Tao nhom that bai: " + e.getMessage());
+            return "DBERROR";
+        }
     }
 
     private static boolean joinGroup(String groupName, String user) {

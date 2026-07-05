@@ -41,7 +41,31 @@ BEGIN
     );
 END;
 
+-- Them cot khoa tai khoan (block user) vao bang users neu chua co
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[users]') AND name = 'is_blocked')
+BEGIN
+    ALTER TABLE users ADD is_blocked BIT NOT NULL DEFAULT 0;
+END;
+
+-- Bang quan ly ban be (loi moi ket ban + trang thai)
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[friends]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE friends (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        user1 NVARCHAR(50) NOT NULL,   -- nguoi gui loi moi
+        user2 NVARCHAR(50) NOT NULL,   -- nguoi nhan loi moi
+        status NVARCHAR(20) NOT NULL DEFAULT 'PENDING', -- PENDING hoac ACCEPTED
+        created_at DATETIME NOT NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[messages]') AND name = 'status')
+BEGIN
+    ALTER TABLE messages ADD status NVARCHAR(20) NOT NULL DEFAULT 'SENT'; -- SENT / DELIVERED / SEEN
+END;
+
 SELECT * FROM users;
 SELECT * FROM chat_groups;
 SELECT * FROM group_members;
 SELECT * FROM messages;
+SELECT * FROM friends;

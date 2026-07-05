@@ -323,19 +323,24 @@ public class ChatController {
         dialog.show();
     }
 
-    // Mở dialog gộp "Tạo nhóm mới" và "Tham gia nhóm có sẵn" - giống popup New Group của Messenger
+    // Mở dialog "Tạo nhóm mới" - việc vào nhóm giờ CHỈ thực hiện qua được người khác mời (menu ⚙ -> Thêm thành viên),
+    // không cho tự join bằng cách gõ tên nhóm nữa, để tránh ai cũng vào được nhóm chỉ vì biết tên
     @FXML
     private void handleShowGroupDialog() {
         Stage dialog = new Stage();
         dialog.initModality(Modality.APPLICATION_MODAL);
-        dialog.setTitle("Nhóm chat");
+        dialog.setTitle("Tạo nhóm chat");
 
         VBox root = new VBox(14);
         root.setPadding(new Insets(24));
         root.setStyle("-fx-background-color: white;");
 
-        Label title = new Label("Tạo nhóm mới hoặc tham gia nhóm có sẵn");
+        Label title = new Label("Tạo nhóm chat mới");
         title.setStyle("-fx-font-size: 15px; -fx-font-weight: bold; -fx-font-family: 'Segoe UI'; -fx-text-fill: #050505;");
+
+        Label subtitle = new Label("Sau khi tạo, vào menu ⚙ ở góc dưới sidebar để mời thêm thành viên.");
+        subtitle.setWrapText(true);
+        subtitle.setStyle("-fx-font-size: 11.5px; -fx-font-family: 'Segoe UI'; -fx-text-fill: #65676b;");
 
         TextField txtName = new TextField();
         txtName.setPromptText("Nhập tên nhóm...");
@@ -356,22 +361,8 @@ public class ChatController {
             dialog.close();
         });
 
-        Button joinBtn = new Button("🚪  Tham gia nhóm đã có");
-        joinBtn.setMaxWidth(Double.MAX_VALUE);
-        joinBtn.setPrefHeight(38);
-        joinBtn.setStyle("-fx-background-color: #f3e8ff; -fx-text-fill: #9b59b6; -fx-font-weight: bold; -fx-background-radius: 10; -fx-cursor: hand; -fx-font-size: 13px;");
-        joinBtn.setOnAction(e -> {
-            String name = txtName.getText().trim();
-            if (name.isEmpty()) {
-                showAlert(Alert.AlertType.WARNING, "Cảnh báo", "Vui lòng nhập tên nhóm cần tham gia!");
-                return;
-            }
-            out.println("JOIN_GROUP;" + currentUsername + ";" + name);
-            dialog.close();
-        });
-
-        root.getChildren().addAll(title, txtName, createBtn, joinBtn);
-        dialog.setScene(new Scene(root, 340, 230));
+        root.getChildren().addAll(title, subtitle, txtName, createBtn);
+        dialog.setScene(new Scene(root, 340, 210));
         dialog.show();
     }
 
@@ -968,8 +959,14 @@ public class ChatController {
                             myGroups.add(data[1]);
                             showAlert(Alert.AlertType.INFORMATION, "Thanh cong", "Da tao va gia nhap nhom: " + data[1]);
                         }
-                        else if ("CREATE_GROUP_FAILED".equals(msgFromServer)) {
-                            showAlert(Alert.AlertType.ERROR, "That bai", "Loi! Khong the tao nhom moi.");
+                        else if (msgFromServer.startsWith("CREATE_GROUP_FAILED;")) {
+                            String[] data = msgFromServer.split(";", 2);
+                            String reason = data.length > 1 ? data[1] : "";
+                            if ("EXISTS".equals(reason)) {
+                                showAlert(Alert.AlertType.WARNING, "Tên nhóm đã tồn tại", "Tên nhóm này đã có người tạo trước rồi. Vui lòng chọn 1 tên khác.");
+                            } else {
+                                showAlert(Alert.AlertType.ERROR, "Lỗi cơ sở dữ liệu", "Server không kết nối được tới SQL Server. Kiểm tra console ServerApp để xem chi tiết.");
+                            }
                         }
                         else if (msgFromServer.startsWith("JOIN_GROUP_SUCCESS;")) {
                             String[] data = msgFromServer.split(";");
