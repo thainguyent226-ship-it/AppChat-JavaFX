@@ -13,7 +13,9 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
@@ -76,6 +78,8 @@ public class ChatController {
     private ProfileController activeProfileController;
     private final Set<String> myGroups = new HashSet<>();
     private final Set<String> unreadChats = new HashSet<>();
+    // Cache tra cuu: username that -> ten hien thi tuy chinh (de hien len giao dien, khong dung de dinh tuyen)
+    private final Map<String, String> displayNames = new HashMap<>();
     private final Set<String> onlineFriends = new HashSet<>();
     private Label currentStatusLabel;
     private String currentStatusContext;
@@ -134,14 +138,15 @@ public class ChatController {
                     setText(null);
                 } else {
                     boolean isGroup = myGroups.contains(item);
+                    String shownName = isGroup ? item : displayNames.getOrDefault(item, item);
                     avatar.setFill(Color.web(isGroup ? "#7c3aed" : colorForName(item)));
-                    initialLabel.setText(isGroup ? "G" : String.valueOf(item.charAt(0)).toUpperCase());
+                    initialLabel.setText(isGroup ? "G" : String.valueOf(shownName.charAt(0)).toUpperCase());
                     initialLabel.setStyle(isGroup
                         ? "-fx-font-size: 13px;"
                         : "-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 14px;");
                     onlineDot.setVisible(!isGroup && onlineFriends.contains(item));
                     boolean unread = unreadChats.contains(item);
-                    nameLabel.setText(item);
+                    nameLabel.setText(shownName);
                     nameLabel.setStyle("-fx-text-fill: #050505; -fx-font-size: 13px; -fx-font-weight: " +
                         (isGroup || unread ? "bold" : "normal") + "; -fx-font-family: 'Segoe UI';");
                     unreadDot.setVisible(unread);
@@ -153,7 +158,7 @@ public class ChatController {
 
         listFriends.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
             if (newValue != null) {
-                lblChattingWith.setText("Đang chat với: " + newValue);
+                lblChattingWith.setText("Đang chat với: " + (myGroups.contains(newValue) ? newValue : displayNames.getOrDefault(newValue, newValue)));
                 clearMessages();
                 unreadChats.remove(newValue);
                 listFriends.refresh();
@@ -186,7 +191,7 @@ public class ChatController {
         bubbleBox.setAlignment(isMe ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
 
         if (!isMe) {
-            Label nameLabel = new Label(sender);
+            Label nameLabel = new Label(displayNames.getOrDefault(sender, sender));
             nameLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #8a8d91; -fx-padding: 0 0 1 12; -fx-font-family: 'Segoe UI';");
             bubbleBox.getChildren().add(nameLabel);
         }
@@ -440,7 +445,7 @@ public class ChatController {
         bubbleBox.setAlignment(isMe ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
 
         if (!isMe) {
-            Label nameLabel = new Label(sender);
+            Label nameLabel = new Label(displayNames.getOrDefault(sender, sender));
             nameLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #8a8d91; -fx-padding: 0 0 1 12; -fx-font-family: 'Segoe UI';");
             bubbleBox.getChildren().add(nameLabel);
         }
@@ -552,23 +557,23 @@ public class ChatController {
 
     private Node buildGearIcon(double size) {
         double cx = size / 2, cy = size / 2;
-        double bodyR = size * 0.32;
-        double toothW = size * 0.20, toothH = size * 0.22;
+        double bodyR = size * 0.30;
+        double toothW = size * 0.17, toothH = size * 0.20;
 
         Group teeth = new Group();
-        for (int i = 0; i < 6; i++) {
-            Rectangle tooth = new Rectangle(-toothW / 2, -bodyR - toothH * 0.65, toothW, toothH);
+        for (int i = 0; i < 8; i++) {
+            Rectangle tooth = new Rectangle(-toothW / 2, -bodyR - toothH * 0.6, toothW, toothH);
             tooth.setFill(Color.web("#65676b"));
-            tooth.setArcWidth(3);
-            tooth.setArcHeight(3);
-            tooth.getTransforms().add(new Rotate(i * 60, 0, 0));
+            tooth.setArcWidth(2);
+            tooth.setArcHeight(2);
+            tooth.getTransforms().add(new Rotate(i * 45, 0, 0));
             teeth.getChildren().add(tooth);
         }
         teeth.setTranslateX(cx);
         teeth.setTranslateY(cy);
 
         Circle body = new Circle(cx, cy, bodyR, Color.web("#65676b"));
-        Circle hole = new Circle(cx, cy, bodyR * 0.45, Color.web("#f0f2f5"));
+        Circle hole = new Circle(cx, cy, bodyR * 0.42, Color.web("#f0f2f5"));
 
         Pane pane = new Pane(teeth, body, hole);
         pane.setPrefSize(size, size);
@@ -876,6 +881,7 @@ public class ChatController {
                             if (!listFriends.getItems().contains(data[1])) {
                                 listFriends.getItems().add(data[1]);
                             }
+                            out.println("GET_DISPLAY_NAMES;" + data[1]);
                             addSystemNotice("Đã kết bạn với " + data[1] + "!");
                         }
                         else if (msgFromServer.startsWith("FRIEND_ACCEPTED;")) {
@@ -883,6 +889,7 @@ public class ChatController {
                             if (!listFriends.getItems().contains(data[1])) {
                                 listFriends.getItems().add(data[1]);
                             }
+                            out.println("GET_DISPLAY_NAMES;" + data[1]);
                             addSystemNotice(data[1] + " đã chấp nhận lời mời kết bạn của bạn!");
                         }
                         else if (msgFromServer.startsWith("FILE_MSG_DM;")) {
@@ -954,6 +961,7 @@ public class ChatController {
                             String selected = listFriends.getSelectionModel().getSelectedItem();
                             if (!listFriends.getItems().contains(fromUser)) {
                                 listFriends.getItems().add(fromUser);
+                                out.println("GET_DISPLAY_NAMES;" + fromUser);
                             }
                             if (fromUser.equals(selected)) {
                                 addMessageBubble(fromUser, content, false, null);
@@ -973,6 +981,23 @@ public class ChatController {
                             } else {
                                 unreadChats.add(groupName);
                                 listFriends.refresh();
+                            }
+                        }
+                        else if (msgFromServer.startsWith("DISPLAY_NAMES;")) {
+                            String[] data = msgFromServer.split(";", 2);
+                            String csv = data.length > 1 ? data[1] : "";
+                            if (!csv.isEmpty()) {
+                                for (String pair : csv.split(",")) {
+                                    String[] kv = pair.split("::", 2);
+                                    if (kv.length == 2 && !kv[0].isEmpty()) {
+                                        displayNames.put(kv[0], kv[1].isEmpty() ? kv[0] : kv[1]);
+                                    }
+                                }
+                                listFriends.refresh();
+                                String selected = listFriends.getSelectionModel().getSelectedItem();
+                                if (selected != null && !myGroups.contains(selected)) {
+                                    lblChattingWith.setText("Đang chat với: " + displayNames.getOrDefault(selected, selected));
+                                }
                             }
                         }
                         else if (msgFromServer.startsWith("MY_CHATS;")) {
@@ -995,6 +1020,7 @@ public class ChatController {
                                         listFriends.getItems().add(c);
                                     }
                                 }
+                                out.println("GET_DISPLAY_NAMES;" + contactsCsv);
                             }
                             listFriends.refresh();
                         }
@@ -1056,8 +1082,8 @@ public class ChatController {
                         }
                         else if (msgFromServer.startsWith("PROFILE_DATA;")) {
                             String[] data = msgFromServer.split(";", -1);
-                            if (activeProfileController != null && data.length >= 6) {
-                                activeProfileController.populateFields(data[1], data[2], data[3], data[4], data[5]);
+                            if (activeProfileController != null && data.length >= 7) {
+                                activeProfileController.populateFields(data[1], data[2], data[3], data[4], data[5], data[6]);
                             }
                         }
                         else if ("VERIFY_OTP_SUCCESS".equals(msgFromServer)) {

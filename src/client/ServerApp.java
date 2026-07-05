@@ -217,8 +217,8 @@ public class ServerApp {
                         }
 
                         case "UPDATE_PROFILE":
-                            if (data.length >= 7) {
-                                if (updateProfile(data[1], data[2], data[3], data[4], data[5], data[6])) {
+                            if (data.length >= 8) {
+                                if (updateProfile(data[1], data[2], data[3], data[4], data[5], data[6], data[7])) {
                                     out.println("UPDATE_PROFILE_SUCCESS");
                                 } else {
                                     out.println("UPDATE_PROFILE_FAILED");
@@ -229,6 +229,22 @@ public class ServerApp {
                         case "GET_PROFILE": {
                             String[] profile = getProfile(data[1]);
                             out.println("PROFILE_DATA;" + String.join(";", profile));
+                            break;
+                        }
+
+                        case "GET_DISPLAY_NAMES": {
+                            String csv = data.length > 1 ? data[1] : "";
+                            StringBuilder sb = new StringBuilder();
+                            if (!csv.isEmpty()) {
+                                boolean first = true;
+                                for (String u : csv.split(",")) {
+                                    if (u.isEmpty()) continue;
+                                    if (!first) sb.append(",");
+                                    sb.append(u).append("::").append(getDisplayName(u));
+                                    first = false;
+                                }
+                            }
+                            out.println("DISPLAY_NAMES;" + sb);
                             break;
                         }
 
@@ -683,8 +699,8 @@ public class ServerApp {
         }
     }
 
-    private static boolean updateProfile(String user, String fullName, String dob, String university, String email, String phone) {
-        String sql = "UPDATE users SET full_name = ?, dob = ?, university = ?, email = ?, phone = ? WHERE username = ?";
+    private static boolean updateProfile(String user, String fullName, String dob, String university, String email, String phone, String displayName) {
+        String sql = "UPDATE users SET full_name = ?, dob = ?, university = ?, email = ?, phone = ?, display_name = ? WHERE username = ?";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             if (conn == null) return false;
@@ -693,16 +709,17 @@ public class ServerApp {
             pstmt.setString(3, university);
             pstmt.setString(4, email);
             pstmt.setString(5, phone);
-            pstmt.setString(6, user);
+            pstmt.setString(6, displayName);
+            pstmt.setString(7, user);
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) { return false; }
     }
 
     private static String[] getProfile(String user) {
-        String sql = "SELECT full_name, dob, university, email, phone FROM users WHERE username = ?";
+        String sql = "SELECT full_name, dob, university, email, phone, display_name FROM users WHERE username = ?";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            if (conn == null) return new String[]{"", "", "", "", ""};
+            if (conn == null) return new String[]{"", "", "", "", "", ""};
             pstmt.setString(1, user);
             try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
@@ -711,12 +728,29 @@ public class ServerApp {
                         nullToEmpty(rs.getString("dob")),
                         nullToEmpty(rs.getString("university")),
                         nullToEmpty(rs.getString("email")),
-                        nullToEmpty(rs.getString("phone"))
+                        nullToEmpty(rs.getString("phone")),
+                        nullToEmpty(rs.getString("display_name"))
                     };
                 }
             }
         } catch (SQLException e) { /* tra ve rong neu loi */ }
-        return new String[]{"", "", "", "", ""};
+        return new String[]{"", "", "", "", "", ""};
+    }
+
+    private static String getDisplayName(String username) {
+        String sql = "SELECT display_name FROM users WHERE username = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            if (conn == null) return username;
+            pstmt.setString(1, username);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    String dn = rs.getString("display_name");
+                    return (dn == null || dn.trim().isEmpty()) ? username : dn;
+                }
+            }
+        } catch (SQLException e) { /* mac dinh dung username neu loi */ }
+        return username;
     }
 
     private static String nullToEmpty(String s) {

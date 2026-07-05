@@ -76,3 +76,13 @@
 [05/07/2026 21:36:48] ACCEPT_FRIEND - user: thai123 - voi: thuc123
 [05/07/2026 22:22:24] LOGIN - user: thai123
 [05/07/2026 22:26:00] LOGOUT - user: thai123
+[05/07/2026 22:27:38] LOGIN - user: thai123
+[05/07/2026 22:27:49] LOGIN - user: thuc123
+[05/07/2026 22:34:49] LOGOUT - user: thai123
+[05/07/2026 22:35:24] LOGIN - user: thai123
+[05/07/2026 22:37:02] LOGOUT - user: thai123
+[05/07/2026 22:37:11] LOGIN - user: thai123
+[05/07/2026 22:43:05] LOGOUT - user: thuc123
+[05/07/2026 22:46:50] LOGOUT - user: thai123
+[05/07/2026 22:47:54] LOGIN - user: thai123
+[05/07/2026 22:49:04] LOGOUT - user: thai123
