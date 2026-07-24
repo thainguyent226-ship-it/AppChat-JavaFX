@@ -86,3 +86,54 @@
 [05/07/2026 22:46:50] LOGOUT - user: thai123
 [05/07/2026 22:47:54] LOGIN - user: thai123
 [05/07/2026 22:49:04] LOGOUT - user: thai123
+[05/07/2026 22:50:14] LOGIN - user: thai123
+[05/07/2026 22:50:23] LOGIN - user: thuc123
+[05/07/2026 22:51:57] LOGIN - user: thai123
+[05/07/2026 22:54:02] LOGOUT - user: thai123
+[05/07/2026 22:54:24] LOGIN - user: thai123
+[05/07/2026 22:54:48] LOGOUT - user: thai123
+[05/07/2026 22:55:16] LOGIN - user: thai123
+[05/07/2026 22:55:46] LOGIN - user: thuc123
+[05/07/2026 22:56:49] BROADCAST - user: admin - <hi>>
+[05/07/2026 22:57:10] LOGOUT - user: thuc123
+[06/07/2026 09:48:00] LOGIN - user: thuc123
+[06/07/2026 09:48:12] LOGIN - user: thai123
+[06/07/2026 10:55:47] LOGIN - user: thuc123
+[06/07/2026 10:58:46] LOGOUT - user: thai123
+[06/07/2026 10:58:56] LOGIN - user: thai123
+[06/07/2026 11:20:24] LOGIN - user: thai123
+[06/07/2026 11:20:41] LOGIN - user: thuc123
+[06/07/2026 11:24:05] BROADCAST - user: admin - <hi>
+[06/07/2026 11:40:21] LOGOUT - user: thuc123
+[06/07/2026 13:17:46] LOGOUT - user: thai123
+[06/07/2026 13:18:06] LOGIN - user: thanh123
+[06/07/2026 13:18:17] LOGIN - user: thuc123
+[06/07/2026 13:18:37] LOGOUT - user: thanh123
+[06/07/2026 13:19:29] REGISTER - user: Serein206 - email: huutriet29112006@gmail.com
+[06/07/2026 13:19:44] LOGIN - user: Serein206
+[06/07/2026 13:20:26] LOGIN - user: thai123
+[06/07/2026 13:20:30] ACCEPT_FRIEND - user: thai123 - voi: Serein206
+[06/07/2026 13:20:41] CREATE_GROUP - user: Serein206 - group: Portugal
+[06/07/2026 13:20:52] LOGOUT - user: thuc123
+[06/07/2026 13:21:10] LOGIN - user: thuc123
+[06/07/2026 13:21:55] INVITE_TO_GROUP - user: Serein206 - them thai123 vao nhom Portugal
+[06/07/2026 13:25:18] LOGIN - user: thuc123
+[06/07/2026 13:25:29] LOGOUT - user: thuc123
+[06/07/2026 13:25:36] ACCEPT_FRIEND - user: thuc123 - voi: Serein206
+[06/07/2026 13:26:11] LOGOUT - user: thuc123
+[06/07/2026 13:26:42] LOGIN - user: thuc123
+[06/07/2026 13:27:29] LOGOUT - user: Serein206
+[06/07/2026 13:29:06] LOGOUT - user: thuc123
+[10/07/2026 08:43:03] LOGIN - user: thuc123
+[10/07/2026 09:05:05] LOGOUT - user: thuc123
+[11/07/2026 10:04:55] LOGIN - user: thai123
+[11/07/2026 10:37:02] LOGIN - user: thuc123
+[11/07/2026 10:37:51] LOGOUT - user: thuc123
+[11/07/2026 13:45:05] LOGIN - user: thuc123
+[11/07/2026 13:46:13] LOGIN - user: thai123
+[11/07/2026 13:46:41] LOGOUT - user: thuc123
+[11/07/2026 13:47:36] LOGOUT - user: thai123
+[18/07/2026 10:49:59] LOGIN - user: thai123
+[18/07/2026 10:52:58] LOGOUT - user: thai123
+[20/07/2026 14:15:48] REGISTER - user: thainguyen - email: thainguyent226@gmail.com
+[20/07/2026 14:32:51] LOGIN - user: thai123

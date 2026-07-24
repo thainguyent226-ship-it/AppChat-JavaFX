@@ -7,12 +7,7 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-/**
- * Ma hoa/giai ma AES-128 (CBC + PKCS5Padding) cho toan bo du lieu trao doi giua Client va Server.
- * Ca 2 phia dung chung 1 khoa bi mat (SECRET_KEY) - phu hop pham vi do an mon hoc.
- * Moi lan ma hoa sinh 1 IV ngau nhien moi, ghep IV + du lieu ma hoa roi encode Base64
- * de van gui duoc qua Socket dang text (PrintWriter.println / BufferedReader.readLine).
- */
+
 public class CryptoUtil {
     private static final String SECRET_KEY = "AppChat2026Secret"; // dung dung 16 hoac 32 ky tu
     private static final String ALGORITHM = "AES/CBC/PKCS5Padding";

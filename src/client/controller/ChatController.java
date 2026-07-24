@@ -78,7 +78,7 @@ public class ChatController {
     private ProfileController activeProfileController;
     private final Set<String> myGroups = new HashSet<>();
     private final Set<String> unreadChats = new HashSet<>();
-    // Cache tra cuu: username that -> ten hien thi tuy chinh (de hien len giao dien, khong dung de dinh tuyen)
+    
     private final Map<String, String> displayNames = new HashMap<>();
     private final Set<String> onlineFriends = new HashSet<>();
     private Label currentStatusLabel;

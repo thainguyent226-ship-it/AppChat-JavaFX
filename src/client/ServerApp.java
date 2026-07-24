@@ -38,9 +38,12 @@ public class ServerApp {
 
     private static final ConcurrentHashMap<String, PrintWriter> onlineUsers = new ConcurrentHashMap<>();
 
-    private static final String SMTP_EMAIL = "your_email@gmail.com";        // TODO: đổi thành Gmail thật của bạn
-    private static final String SMTP_APP_PASSWORD = "xxxx xxxx xxxx xxxx"; // TODO: dán App Password 16 ký tự vào đây
-
+   
+    private static final String SMTP_HOST = "live.smtp.mailtrap.io";
+    private static final int SMTP_PORT = 587;
+    private static final String SMTP_EMAIL = "api"; 
+    private static final String SMTP_APP_PASSWORD = "b8e7c63c7a35d67df2bd00bc296496eb";
+    private static final String SMTP_FROM_EMAIL = "hello@demomailtrap.co"; 
     private static final ConcurrentHashMap<String, OtpEntry> pendingOtp = new ConcurrentHashMap<>();
 
     private static class OtpEntry {
@@ -211,8 +214,14 @@ public class ServerApp {
                             String targetEmail = data[1];
                             String otpCode = generateOtpCode();
                             pendingOtp.put(targetEmail, new OtpEntry(otpCode, System.currentTimeMillis() + 5 * 60 * 1000)); // het han sau 5 phut
-                            out.println("SEND_OTP_SUCCESS;" + otpCode);
-                            System.out.println("[OTP] Da sinh ma xac thuc cho email: " + targetEmail + " -> Ma: " + otpCode);
+                            boolean emailSent = sendOtpEmail(targetEmail, otpCode);
+                            if (emailSent) {
+                                out.println("SEND_OTP_SUCCESS;" + otpCode);
+                                System.out.println("[OTP] Da gui email qua Mailtrap cho: " + targetEmail + " -> Ma: " + otpCode);
+                            } else {
+                                out.println("SEND_OTP_FAILED;EMAIL_ERROR");
+                                System.out.println("[OTP] Gui email that bai cho: " + targetEmail);
+                            }
                             break;
                         }
 
@@ -333,7 +342,7 @@ public class ServerApp {
                         }
 
                         case "FETCH_HISTORY": {
-                            String chatContext = data[1]; // Ten nhom hoac ten nguoi ban dang xem
+                            String chatContext = data[1]; 
                             String historyData = fetchChatHistory(loggedInUser, chatContext);
                             String myLastStatus = "NONE";
                             if (!isGroup(chatContext)) {
@@ -664,13 +673,13 @@ public class ServerApp {
         Properties props = new Properties();
         props.put("mail.smtp.auth", "true");
         props.put("mail.smtp.starttls.enable", "true");
-        props.put("mail.smtp.starttls.required", "true");
-        props.put("mail.smtp.host", "smtp.gmail.com");
-        props.put("mail.smtp.port", "587");
-        props.put("mail.smtp.ssl.protocols", "TLSv1.2");
+        props.put("mail.smtp.starttls.required", "true"); // Mailtrap Sending bat buoc TLS tren port 587
+        props.put("mail.smtp.host", SMTP_HOST);
+        props.put("mail.smtp.port", String.valueOf(SMTP_PORT));
         props.put("mail.smtp.connectiontimeout", "10000");
         props.put("mail.smtp.timeout", "10000");
         props.put("mail.smtp.writetimeout", "10000");
+        props.put("mail.smtp.localhost", "localhost");
 
         Session session = Session.getInstance(props, new Authenticator() {
             @Override
@@ -681,7 +690,7 @@ public class ServerApp {
 
         try {
             Message message = new MimeMessage(session);
-            message.setFrom(new InternetAddress(SMTP_EMAIL));
+            message.setFrom(new InternetAddress(SMTP_FROM_EMAIL));
             message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(toEmail));
             message.setSubject("Ma xac thuc App Chat cua ban");
             message.setText("Ma OTP xac thuc email cua ban la: " + otpCode +

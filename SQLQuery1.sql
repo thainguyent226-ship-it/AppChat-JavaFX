@@ -42,6 +42,11 @@ BEGIN
 END;
 
 -- Them cot khoa tai khoan (block user) vao bang users neu chua co
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[users]') AND name = 'display_name')
+BEGIN
+    ALTER TABLE users ADD display_name NVARCHAR(100) NULL;
+END;
+
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[users]') AND name = 'is_blocked')
 BEGIN
     ALTER TABLE users ADD is_blocked BIT NOT NULL DEFAULT 0;
